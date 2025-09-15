@@ -1,0 +1,414 @@
+---
+title: "Energy Budget Comparison: ZooMSS vs DBPM"
+author: "Marine Ecosystem Modeling Analysis"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+# Load required libraries
+library(knitr)
+library(DT)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(kableExtra)
+```
+
+# Overview {.tabset}
+
+This notebook provides a comprehensive comparison of energy budget formulations between the **ZooMSS** (Zooplankton Model of Size Spectra) and **DBPM** (Dynamic Bioclimate Envelope Model with size-spectrum) approaches for marine ecosystem modeling.
+
+## Executive Summary
+
+### Key Differences
+
+The fundamental difference lies in how metabolic costs are handled:
+
+- **ZooMSS**: Implicit metabolism embedded in growth conversion efficiency
+- **DBPM**: Explicit metabolism subtracted from assimilated energy
+
+### Conceptual Energy Flow Differences
+
+**ZooMSS Energy Flow (Simplified):**
+```
+Consumed Food → Growth Conversion Efficiency → Somatic Growth
+                    (GrossGEscale × Carbon)
+```
+
+**DBPM Energy Flow (Explicit):**
+```
+Consumed Food → Assimilation → Available Energy → Growth + Reproduction
+                     ↓                    ↓
+                Unassimilated        Metabolism
+                   (Feces)            (Costs)
+```
+
+### Model Philosophy
+
+```{r model-philosophy}
+philosophy_data <- data.frame(
+  Aspect = c("Metabolism", "Parameters", "Complexity", "Temperature", "Reproduction"),
+  ZooMSS = c("Implicit in GGE", "Fewer (combined)", "Simpler", "Applied to growth", "Fixed recruitment"),
+  DBPM = c("Explicit subtraction", "More (separate)", "More mechanistic", "Applied to metabolism", "Dynamic allocation"),
+  stringsAsFactors = FALSE
+)
+
+kable(philosophy_data, caption = "Philosophical differences between model approaches") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  column_spec(1, bold = TRUE, color = "black", background = "#f7f7f7") %>%
+  column_spec(2, background = "#e1f5fe") %>%
+  column_spec(3, background = "#f3e5f5")
+```
+
+---
+
+# Detailed Comparison {.tabset}
+
+## Energy Flow Equations
+
+### ZooMSS Energy Flow (Simplified)
+
+```{r zoomss-equations}
+cat("
+ZooMSS Energy Budget:
+===================
+
+1. Assimilation Efficiency (combined):
+   assim_eff = GrossGEscale × Carbon
+   
+2. Growth Rate:
+   gg = assim_eff × consumed_food
+   
+3. No explicit metabolism:
+   - Metabolic costs implicitly included in GGE
+   
+4. Temperature effect:
+   growth_rate = temp_eff × gg
+")
+```
+
+### DBPM Energy Flow (Explicit)
+
+```{r dbpm-equations}
+cat("
+DBPM Energy Budget:
+==================
+
+1. Assimilation:
+   Assimilated = αᵢ × Feeding_rate
+   
+2. Metabolism:
+   Metabolism = ks × m^p + ka × feeding_rate
+   
+3. Net Production:
+   Net_production = Assimilated - Metabolism
+   
+4. Growth Allocation:
+   Growth = Net_production × (1 - Rᵢ)
+   
+5. Reproduction:
+   Reproduction = Net_production × Rᵢ
+")
+```
+
+## Parameter Comparison
+
+```{r parameter-table}
+param_data <- data.frame(
+  Process = c("CONSUMPTION", "", "", 
+              "ASSIMILATION", "", "",
+              "GROWTH EFFICIENCY", "", "",
+              "METABOLISM", "", "",
+              "GROWTH ALLOCATION", "",
+              "REPRODUCTION", "",
+              "MORTALITY", "", ""),
+  Parameter = c("Feeding rate", "Code variable", "Search volume",
+                "Assimilation efficiency", "Code implementation", "Carbon accounting",
+                "Growth conversion", "Code variable", "Combined efficiency",
+                "Standard metabolism", "Activity costs", "Code implementation",
+                "Somatic growth", "Code variable",
+                "Reproductive allocation", "Code implementation",
+                "Predation mortality", "Senescence mortality", "Code variable"),
+  ZooMSS = c("Fi(w,t) = Vi(w) × ∫φi(w,w')Nj(w',t)dw'", "current_ingested_phyto + cs", "SearchVol = SearchCoef × w^SearchExp",
+             "**Implicit in GGE**", "Part of assim_eff", "Carbon (0.005-0.15)",
+             "Eij = 2.5 × Cj (standard)", "GrossGEscale (2.5)", "assim_eff = GrossGEscale × Carbon",
+             "**Implicit in GGE**", "**Implicit in GGE**", "Not calculated",
+             "gg = assim_eff × consumed_food", "gg (growth rate)",
+             "**None (fixed recruitment)**", "Boundary conditions fixed",
+             "μp(w,t) = ∑∫φj(w',w)Vj(w')Nj(w',t)dw'", "μS(w,t) = ZSpre × (w/Wmat)^ZSexp", "M_sb + M2"),
+  DBPM = c("FPi(m,t) = APmaP × ∫φ(m,m')Ni(m',t)dm'", "feeding_rate", "APmaP (volume searched)",
+           "αi (explicit parameter)", "assimilation_efficiency", "Not explicitly modeled",
+           "Ki (after metabolism)", "growth_efficiency", "αi × (1 - metabolism) × Ki",
+           "ks × m^p (explicit)", "ka × feeding_rate", "metabolic_cost",
+           "Gi = (αi × Fi - Mi) × (1-Ri)", "growth_rate",
+           "Ri × (αi × Fi - Mi)", "reproductive_rate",
+           "Similar formulation", "DiO = intrinsic + senescent", "mortality_rate"),
+  stringsAsFactors = FALSE
+)
+
+# Create a more readable table
+DT::datatable(param_data, 
+              caption = "Detailed parameter comparison between ZooMSS and DBPM",
+              options = list(pageLength = 20, scrollX = TRUE),
+              rownames = FALSE) %>%
+  formatStyle(columns = "Process", fontWeight = "bold") %>%
+  formatStyle(columns = "ZooMSS", backgroundColor = "#e1f5fe") %>%
+  formatStyle(columns = "DBPM", backgroundColor = "#f3e5f5")
+```
+
+## Code Implementation
+
+### ZooMSS Code Structure
+
+```{r zoomss-code, eval=FALSE}
+# In zoomss_setup.R:
+# Assimilation efficiency matrix (combines growth efficiency and carbon content)
+assim_eff <- matrix(param$Groups$GrossGEscale * param$Groups$Carbon, 
+                    nrow = param$ngrps, 
+                    ncol = length(param$w))
+
+# For phytoplankton feeding
+assim_phyto <- (param$Groups$GrossGEscale) * param$cc_phyto  # cc_phyto = 0.1
+
+# In zoomss_run.R:
+# Growth calculation (no explicit metabolism subtraction)
+gg <- current_ingested_phyto + cs  # Direct conversion via assim_eff
+
+# Growth multiplier includes assimilation efficiency
+growth_multiplier <- colSums(N * assim_eff)
+```
+
+### Key ZooMSS Variables
+
+```{r zoomss-variables}
+zoomss_vars <- data.frame(
+  Variable = c("GrossGEscale", "Carbon", "assim_eff", "cc_phyto", "gg", "growth_multiplier"),
+  Description = c("Gross growth efficiency scaling factor (typically 2.5)",
+                  "Carbon content of prey (0.005-0.15 for different taxa)",
+                  "Combined assimilation efficiency matrix",
+                  "Carbon content of phytoplankton (0.1)",
+                  "Growth rate after assimilation efficiency applied",
+                  "Growth multiplier incorporating population and efficiency"),
+  Type = c("Parameter", "Parameter", "Calculated", "Parameter", "State", "State"),
+  stringsAsFactors = FALSE
+)
+
+kable(zoomss_vars, caption = "Key ZooMSS variables and their roles") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(3, color = ifelse(zoomss_vars$Type == "Parameter", "blue", "darkgreen"))
+```
+
+---
+
+# Implementation Insights {.tabset}
+
+## Carbon Content as Food Quality
+
+One of ZooMSS's innovations is using carbon content to represent food quality:
+
+```{r carbon-content-plot}
+# Create a visualization of carbon content across taxa
+taxa_carbon <- data.frame(
+  Taxa = c("Jellyfish", "Larvaceans", "Salps", "Omnivorous Copepods", 
+           "Carnivorous Copepods", "Chaetognaths", "Euphausiids", "Ciliates"),
+  Carbon_Content = c(0.005, 0.02, 0.03, 0.05, 0.08, 0.10, 0.12, 0.15),
+  Group_Type = c("Gelatinous", "Filter feeder", "Filter feeder", "Copepod",
+                 "Copepod", "Predator", "Krill", "Microzooplankton"),
+  stringsAsFactors = FALSE
+)
+
+p1 <- ggplot(taxa_carbon, aes(x = reorder(Taxa, Carbon_Content), y = Carbon_Content, fill = Group_Type)) +
+  geom_col(alpha = 0.8) +
+  scale_fill_viridis_d(name = "Group Type") +
+  labs(title = "Carbon Content by Taxa in ZooMSS",
+       subtitle = "Higher carbon content = higher food quality",
+       x = "Taxa", y = "Carbon Content (fraction)",
+       caption = "Range: 0.5% (jellyfish) to 15% (ciliates)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_text(aes(label = paste0(Carbon_Content*100, "%")), 
+            vjust = -0.5, size = 3)
+
+ggplotly(p1)
+```
+
+### Impact on Growth Efficiency
+
+```{r growth-efficiency-impact}
+# Calculate effective growth efficiency for different prey types
+taxa_carbon$GrossGEscale <- 2.5  # Standard value
+taxa_carbon$Effective_GGE <- taxa_carbon$GrossGEscale * taxa_carbon$Carbon_Content
+
+p2 <- ggplot(taxa_carbon, aes(x = reorder(Taxa, Effective_GGE), y = Effective_GGE, fill = Group_Type)) +
+  geom_col(alpha = 0.8) +
+  scale_fill_viridis_d(name = "Group Type") +
+  labs(title = "Effective Growth Efficiency by Prey Type",
+       subtitle = "assim_eff = GrossGEscale × Carbon_Content",
+       x = "Prey Taxa", y = "Effective Growth Efficiency",
+       caption = "Shows how prey quality affects predator growth") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_text(aes(label = round(Effective_GGE, 3)), 
+            vjust = -0.5, size = 3)
+
+ggplotly(p2)
+```
+
+## Temperature Effects
+
+The models apply temperature effects at different points in the energy budget:
+
+```{r temperature-comparison}
+temp_comparison <- data.frame(
+  Model = c("ZooMSS", "DBPM"),
+  Application_Point = c("Growth rate directly", "Metabolic costs"),
+  Equation = c("growth_rate = temp_eff × gg", "metabolic_cost = temp_eff × metabolism"),
+  Effect = c("Multiplicative on net growth", "Additive cost, reduces net growth"),
+  stringsAsFactors = FALSE
+)
+
+kable(temp_comparison, caption = "Temperature effect implementation differences") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  row_spec(1, background = "#e1f5fe") %>%
+  row_spec(2, background = "#f3e5f5")
+```
+
+---
+
+# Adding Reproduction to ZooMSS {.tabset}
+
+## Current State vs. Target
+
+### Current ZooMSS Approach
+- **Fixed recruitment**: Boundary conditions set constant recruitment
+- **No reproductive costs**: All assimilated energy goes to somatic growth
+- **Simplified dynamics**: Stable but potentially unrealistic
+
+### Target DBPM-style Reproduction
+- **Dynamic recruitment**: Based on reproductive investment
+- **Energy trade-offs**: Energy allocated between growth and reproduction
+- **Size-dependent maturity**: Reproductive investment varies with size
+
+## Implementation Strategy
+
+### Option A: Keep Implicit Metabolism (Recommended)
+
+```{r implementation-option-a, eval=FALSE}
+# Modify growth calculation to include reproductive allocation
+# In zoomss_run.R:
+
+# Calculate maturity ogive (fraction mature at each size)
+maturity_ogive <- plogis((log(param$w) - log(param$Groups$Wmat)) / param$Groups$MatSlope)
+
+# Calculate reproductive investment (size-dependent)
+repro_invest <- param$Groups$ReproInvest * maturity_ogive
+
+# Modified growth calculation
+net_production <- current_ingested_phyto + cs  # Total assimilated energy
+somatic_growth <- net_production * (1 - repro_invest)
+reproductive_output <- net_production * repro_invest
+
+# Update growth rate
+gg <- somatic_growth
+
+# Calculate recruitment (simplified)
+recruitment <- colSums(reproductive_output * N) / param$Groups$EggMass
+```
+
+### Option B: Make Metabolism Explicit
+
+```{r implementation-option-b, eval=FALSE}
+# More mechanistic approach
+# In zoomss_run.R:
+
+# Separate assimilation from metabolism
+assimilated_energy <- current_ingested_phyto + cs
+metabolic_cost <- param$Groups$MetabolicRate * param$w^param$Groups$MetabolicExp
+
+# Net production after metabolism
+net_production <- assimilated_energy - metabolic_cost
+
+# Allocate between growth and reproduction
+somatic_growth <- net_production * (1 - repro_invest)
+reproductive_output <- net_production * repro_invest
+
+gg <- somatic_growth
+```
+
+## Required New Parameters
+
+```{r new-parameters}
+new_params <- data.frame(
+  Parameter = c("Wmat", "MatSlope", "ReproInvest", "EggMass", "MetabolicRate", "MetabolicExp"),
+  Description = c("Maturation weight (g)", 
+                  "Maturation slope parameter",
+                  "Maximum reproductive investment (fraction)",
+                  "Egg mass (g)",
+                  "Metabolic rate coefficient",
+                  "Metabolic scaling exponent"),
+  Default_Value = c("Group-specific", "0.2", "0.3", "Group-specific", "0.1", "0.75"),
+  Required_For = c("Option A & B", "Option A & B", "Option A & B", "Option A & B", "Option B only", "Option B only"),
+  stringsAsFactors = FALSE
+)
+
+kable(new_params, caption = "New parameters required for reproductive implementation") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(4, color = ifelse(grepl("Option B", new_params$Required_For), "red", "blue"))
+```
+
+## Expected Benefits
+
+### Ecological Realism
+- **Life history trade-offs**: Growth vs. reproduction
+- **Environmental responses**: Reproduction varies with food availability
+- **Population dynamics**: Self-regulating recruitment
+
+### Model Capabilities
+- **Climate sensitivity**: Reproductive responses to environmental change
+- **Fisheries impacts**: Effects on recruitment and population recovery
+- **Evolutionary dynamics**: Selection pressures on life history traits
+
+---
+
+# Conclusions
+
+## Key Insights
+
+1. **ZooMSS simplicity**: By combining assimilation and metabolism into gross growth efficiency, ZooMSS reduces parameter requirements while maintaining essential dynamics
+
+2. **Carbon content innovation**: Using prey carbon content as a food quality metric is a novel approach that captures important trophic dynamics
+
+3. **Implementation trade-offs**: 
+   - Option A (implicit metabolism) maintains ZooMSS philosophy
+   - Option B (explicit metabolism) provides more mechanistic control
+
+## Recommendations
+
+For adding reproduction to ZooMSS:
+
+1. **Start with Option A**: Maintains model simplicity and current structure
+2. **Add reproductive parameters gradually**: Begin with simple maturity ogives
+3. **Validate against observations**: Compare recruitment patterns with data
+4. **Consider Option B later**: If more detailed metabolic control is needed
+
+The key advantage of ZooMSS's approach is that it captures the essential energy flow dynamics with fewer parameters, making it more tractable for global-scale applications while still being mechanistically grounded.
+
+---
+
+*This analysis provides a foundation for implementing DBPM-style reproduction in ZooMSS while maintaining the model's core advantages of simplicity and computational efficiency.*

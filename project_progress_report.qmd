@@ -1,0 +1,408 @@
+---
+title: "ZooMSS Development & Research Progress Report"
+subtitle: "Marine Ecosystem Modeling and Antarctic Regional Studies"
+author: "Your Name"
+date: last-modified
+date-format: "MMMM D, YYYY"
+bibliography: references.bib
+---
+
+```{r setup}
+#| include: false
+
+# Load required packages
+required_packages <- c("knitr", "dplyr", "ggplot2", "plotly", "DT", "kableExtra", 
+                      "tidyr", "viridis", "grid")
+
+for(pkg in required_packages) {
+  if(!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg, quiet = TRUE)
+  }
+  library(pkg, character.only = TRUE, quietly = TRUE)
+}
+
+# Set global chunk options
+opts_chunk$set(
+  fig.width = 8,
+  fig.height = 5,
+  fig.align = "center",
+  dpi = 300,
+  out.width = "100%"
+)
+```
+
+::: {.callout-note appearance="simple"}
+## Executive Summary
+
+This report outlines progress and future directions for two major research projects: **ZooMSS marine ecosystem model development** and **ACEAS regional modeling in East Antarctica**. Key milestones include implementing fish reproduction for FishMIP collaboration, presenting to UQ lab group (December 2024), and showcasing new capabilities at CMIP workshop (March 2026).
+:::
+
+# Introduction
+
+Marine ecosystem modeling faces increasing demands for biological realism and integration with global climate projections. This report details progress on the **ZooMSS (Zooplankton Model of Size Spectra)** framework^[ZooMSS represents marine ecosystems through size-structured population dynamics] alongside complementary work in Antarctic regional modeling through the **ACEAS (Antarctic Climate & Ecosystems CRC)** program.
+
+```{r timeline-setup}
+#| echo: false
+# Create timeline data
+timeline_data <- data.frame(
+  Project = c("ZooMSS", "ZooMSS", "ZooMSS", "ACEAS", "ZooMSS", "ACEAS"),
+  Task = c("Fish Reproduction Implementation", "UQ Lab Presentation", "CMIP Workshop Presentation", 
+           "Regional Modeling Phase 1", "Long-term Scenarios (2300)", "Regional Modeling Phase 2"),
+  Start = as.Date(c("2024-09-01", "2024-12-01", "2026-03-01", 
+                    "2024-10-01", "2025-01-01", "2025-06-01")),
+  End = as.Date(c("2024-11-30", "2024-12-15", "2026-03-15", 
+                  "2025-05-31", "2025-08-31", "2025-12-31")),
+  Priority = c("Critical", "High", "Critical", "Medium", "Medium", "High"),
+  Status = c("In Progress", "Planned", "Planned", "Planned", "Planned", "Planned")
+)
+```
+
+# ZooMSS Model Development {#sec-zoomss}
+
+## Current Status & Achievements
+
+The ZooMSS model has undergone significant development in 2024, with major advances in **reproduction dynamics implementation** for fish functional groups. This enhancement is crucial for the model's continued participation in international collaborations.
+
+::: {.column-margin}
+**FishMIP** (Fisheries and Marine Ecosystem Model Intercomparison Project) requires all participating models to include fishing scenarios, which necessitates realistic fish population dynamics including reproduction.
+:::
+
+### Fish Reproduction Implementation {#sec-reproduction}
+
+The implementation of fish reproduction represents a fundamental advancement in ZooMSS capabilities:
+
+```{r reproduction-features}
+#| echo: false
+reproduction_features <- data.frame(
+  Component = c("Spawning Stock Biomass (SSB)", "Recruitment Dynamics", "Seasonal Spawning", 
+                "Size-dependent Maturity", "Energy Allocation", "Population Feedback"),
+  Status = c("✅ Complete", "✅ Complete", "✅ Complete", 
+             "✅ Complete", "🔄 In Progress", "🔄 Testing"),
+  Description = c("Biomass of reproductively mature individuals",
+                  "Beverton-Holt stock-recruitment relationship",
+                  "Temperature and photoperiod-driven spawning cycles",
+                  "Probabilistic maturation by body size",
+                  "Trade-offs between growth and reproduction",
+                  "Density-dependent population regulation")
+)
+
+kable(reproduction_features, 
+      caption = "Fish Reproduction Implementation Status",
+      col.names = c("Component", "Status", "Description")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) %>%
+  column_spec(2, width = "15%") %>%
+  column_spec(3, width = "50%")
+```
+
+### Extended Testing Framework
+
+A comprehensive testing framework has been developed to validate reproduction dynamics:
+
+- **500-year simulations** to assess long-term stability
+- **Chlorophyll gradient testing** (oligotrophic to eutrophic conditions)
+- **Seasonal variation analysis** across environmental gradients
+- **Multi-species interaction** validation for 12 functional groups
+
+::: {.column-margin}
+The testing framework explores model behavior across chlorophyll levels from 0.01 mg/m³ (oligotrophic) to 10.0 mg/m³ (eutrophic), representing the full range of marine productivity.
+:::
+
+## FishMIP Integration Requirements
+
+ZooMSS participation in FishMIP depends on the successful implementation of fishing scenarios, which require:
+
+1. **Realistic fish population dynamics** ✅ *Complete*
+2. **Spawning stock biomass tracking** ✅ *Complete*  
+3. **Recruitment variability** ✅ *Complete*
+4. **Fishing mortality implementation** 🔄 *Next Phase*
+5. **Economic scenario coupling** 📋 *Planned*
+
+## Visualization Capabilities
+
+The model now includes comprehensive visualization tools showing both zooplankton and fish dynamics:
+
+```{r vis-capabilities}
+#| echo: false
+vis_types <- data.frame(
+  `Plot Type` = c("Size Spectra", "Time Series - Abundance", "Time Series - Biomass", 
+                  "Fish Reproduction Metrics", "Environmental Forcing", "Trophic Interactions"),
+  `Groups Displayed` = c("All 12 functional groups", "All groups (9 zooplankton + 3 fish)", 
+                         "All groups with biomass", "Fish-specific (SSB, recruitment)", 
+                         "Temperature, chlorophyll", "Predator-prey relationships"),
+  `Key Insights` = c("Community size structure", "Population dynamics", "Ecosystem biomass",
+                     "Reproductive success", "Environmental drivers", "Food web structure")
+)
+
+kable(vis_types,
+      caption = "ZooMSS Visualization Capabilities") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = TRUE)
+```
+
+# ACEAS Regional Modeling {#sec-aceas}
+
+## Project Overview
+
+The **Antarctic Climate & Ecosystems CRC (ACEAS)** regional modeling project focuses on understanding climate impacts on East Antarctic ecosystems through high-resolution modeling approaches.
+
+::: {.column-margin}
+**ACEAS** represents a collaborative effort to understand how climate change affects Antarctic marine ecosystems, with particular focus on sea ice dynamics and ecosystem responses.
+:::
+
+### Objectives
+
+- Develop high-resolution regional ocean-biogeochemical models
+- Assess climate change impacts on Antarctic marine ecosystems  
+- Integrate sea ice dynamics with ecosystem processes
+- Provide projections for policy and conservation planning
+
+### Methodology
+
+The ACEAS approach combines:
+
+- **Regional ocean modeling** with enhanced spatial resolution
+- **Biogeochemical cycle simulation** including nutrient dynamics
+- **Sea ice-ecosystem coupling** for realistic environmental forcing
+- **Multi-scenario analysis** under different climate pathways
+
+# Project Roadmap & Timeline {#sec-roadmap}
+
+## Time Allocation Strategy
+
+The dual-project structure requires careful time management and strategic coordination:
+
+```{r time-allocation}
+#| echo: false
+#| fig-cap: "Monthly time allocation between ZooMSS and ACEAS projects"
+
+months <- c("Oct 2024", "Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", 
+            "Apr 2025", "May 2025", "Jun 2025", "Jul 2025", "Aug 2025", "Sep 2025")
+
+zoomss_time <- c(70, 80, 90, 60, 50, 85, 60, 50, 40, 60, 70, 60)
+aceas_time <- c(30, 20, 10, 40, 50, 15, 40, 50, 60, 40, 30, 40)
+
+time_df <- data.frame(
+  Month = factor(months, levels = months),
+  ZooMSS = zoomss_time,
+  ACEAS = aceas_time
+)
+
+time_long <- time_df %>%
+  tidyr::pivot_longer(cols = c(ZooMSS, ACEAS), 
+                      names_to = "Project", 
+                      values_to = "Percentage")
+
+ggplot(time_long, aes(x = Month, y = Percentage, fill = Project)) +
+  geom_col(position = "stack", alpha = 0.8) +
+  scale_fill_manual(values = c("ZooMSS" = "#2E86AB", "ACEAS" = "#A23B72")) +
+  labs(x = "Month", y = "Time Allocation (%)", 
+       title = "Project Time Allocation Strategy") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold"),
+        legend.position = "bottom") +
+  geom_hline(yintercept = 50, linetype = "dashed", alpha = 0.5)
+```
+
+## Key Milestones {#sec-milestones}
+
+### Short-term (October 2024 - March 2025)
+
+::: {.callout-important}
+## Critical Deliverables
+
+**December 2024**: UQ Lab Group Presentation
+- Showcase fish reproduction implementation
+- Demonstrate extended testing framework  
+- Present validation results across environmental gradients
+:::
+
+1. **Complete fish reproduction validation** (October-November 2024)
+2. **Prepare UQ presentation materials** (November-December 2024)  
+3. **Initiate ACEAS regional model setup** (January-February 2025)
+4. **Begin long-term scenario preparations** (February-March 2025)
+
+### Medium-term (April 2025 - September 2025)
+
+1. **ACEAS Phase 1 completion** - Regional model calibration and validation
+2. **ZooMSS long-term scenarios** - Simulations extending to 2300
+3. **Fishing scenario implementation** - Preparation for FishMIP protocols
+4. **CMIP workshop preparation** - Materials and analysis for March 2026
+
+### Long-term (October 2025 - March 2026)
+
+::: {.callout-tip}
+## Major Presentation Opportunity
+
+**March 2026**: CMIP Workshop
+- Present ZooMSS with full fish reproduction capabilities
+- Demonstrate FishMIP-ready fishing scenarios
+- Showcase long-term projection capabilities to 2300
+:::
+
+1. **ACEAS Phase 2 implementation** - Advanced regional scenarios
+2. **ZooMSS-FishMIP integration** - Full protocol implementation  
+3. **Manuscript preparation** - Multiple publications from both projects
+4. **CMIP workshop presentation** - International model intercomparison showcase
+
+## Risk Assessment & Mitigation
+
+```{r risk-assessment}
+#| echo: false
+risks <- data.frame(
+  Risk = c("Fish reproduction bugs", "ACEAS model instability", "Time management conflicts", 
+           "CMIP deadline pressure", "Computing resource limitations"),
+  Impact = c("High", "Medium", "High", "Medium", "Low"),
+  Probability = c("Low", "Medium", "Medium", "Low", "Medium"),
+  Mitigation = c("Extensive testing framework", "Incremental development approach", 
+                 "Clear time allocation strategy", "Early preparation timeline",
+                 "Cloud computing backup plan")
+)
+
+kable(risks,
+      caption = "Project Risk Assessment Matrix") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(2, background = ifelse(risks$Impact == "High", "#ffcccc", 
+                                   ifelse(risks$Impact == "Medium", "#fff2cc", "#ccffcc"))) %>%
+  column_spec(3, background = ifelse(risks$Probability == "High", "#ffcccc", 
+                                   ifelse(risks$Probability == "Medium", "#fff2cc", "#ccffcc")))
+```
+
+# Technical Implementation Details {#sec-technical}
+
+## ZooMSS Architecture Enhancements
+
+The fish reproduction implementation required significant architectural changes:
+
+```{r arch-diagram}
+#| echo: false
+#| fig-cap: "ZooMSS model architecture with reproduction module"
+#| fig-height: 6
+
+# Create a conceptual architecture diagram
+arch_data <- data.frame(
+  Component = c("Environmental Forcing", "Size-Structured Dynamics", "Feeding Interactions", 
+                "Growth & Mortality", "Fish Reproduction", "Population Feedback"),
+  Level = c(1, 2, 2, 3, 3, 4),
+  x = c(3, 1, 5, 1, 5, 3),
+  y = c(4, 3, 3, 2, 2, 1),
+  Type = c("Input", "Core", "Core", "Process", "Process", "Output")
+)
+
+ggplot(arch_data, aes(x = x, y = y, label = Component, fill = Type)) +
+  geom_point(size = 20, alpha = 0.7, shape = 21, stroke = 2) +
+  geom_text(size = 3, fontface = "bold") +
+  scale_fill_viridis_d(option = "plasma", alpha = 0.7) +
+  xlim(0, 6) + ylim(0, 5) +
+  theme_void() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5)) +
+  labs(title = "ZooMSS Model Architecture") +
+  geom_segment(aes(x = 3, y = 3.5, xend = 1, yend = 3.5), 
+               arrow = arrow(length = unit(0.3, "cm")), 
+               linewidth = 1, alpha = 0.6, inherit.aes = FALSE) +
+  geom_segment(aes(x = 3, y = 3.5, xend = 5, yend = 3.5), 
+               arrow = arrow(length = unit(0.3, "cm")), 
+               linewidth = 1, alpha = 0.6, inherit.aes = FALSE)
+```
+
+## Computational Performance
+
+The extended testing framework requires significant computational resources:
+
+- **500-year simulations**: ~45 minutes per run on standard hardware
+- **Gradient testing**: Multiple scenarios across environmental conditions  
+- **Memory optimization**: Efficient storage of time series data
+- **Parallel processing**: Multiple scenario execution capabilities
+
+::: {.column-margin}
+Current testing uses chlorophyll gradients with three levels: 0.01 mg/m³ (oligotrophic), 1.0 mg/m³ (mesotrophic), and 10.0 mg/m³ (eutrophic).
+:::
+
+# Future Directions {#sec-future}
+
+## ZooMSS Evolution
+
+### Immediate Priorities (Next 6 months)
+
+1. **Fishing mortality implementation** for FishMIP compliance
+2. **Economic scenario coupling** for policy relevance  
+3. **Model intercomparison** with other FishMIP participants
+4. **Long-term stability** assessment through 2300
+
+### Long-term Vision (1-2 years)
+
+- **Regional implementations** for specific marine ecosystems
+- **Climate coupling** with Earth System Models
+- **Machine learning integration** for parameter optimization
+- **Uncertainty quantification** frameworks
+
+## ACEAS Development
+
+### Phase 1 Objectives
+
+- High-resolution regional ocean model for East Antarctica
+- Validation against observational data
+- Baseline ecosystem state characterization
+
+### Phase 2 Expansion  
+
+- Multi-scenario climate projections
+- Ecosystem service quantification
+- Policy-relevant impact assessments
+- Integration with global Earth System Models
+
+# Conclusions {#sec-conclusions}
+
+The dual-project approach represents a strategic investment in both **fundamental marine ecosystem modeling** (ZooMSS) and **regional climate impact assessment** (ACEAS). The implementation of fish reproduction in ZooMSS marks a critical milestone enabling participation in international model intercomparison projects, while the ACEAS work provides essential regional perspectives on Antarctic ecosystem changes.
+
+::: {.callout-note}
+## Success Metrics
+
+**ZooMSS**: Successful FishMIP integration, stable long-term projections, international recognition at CMIP workshop
+
+**ACEAS**: Validated regional model, policy-relevant projections, contribution to Antarctic science community
+
+**Integration**: Balanced time allocation, complementary skill development, enhanced research profile
+:::
+
+The roadmap balances immediate technical requirements with long-term scientific objectives, positioning both projects for maximum impact in marine ecosystem science and climate change research.
+
+---
+
+## Appendices {.appendix}
+
+### A. Technical Specifications
+
+**ZooMSS Model Configuration:**
+- 12 functional groups (9 zooplankton, 3 fish)
+- 191 size classes spanning 6 orders of magnitude
+- Monthly time steps with sub-daily environmental forcing
+- Reproduction dynamics with seasonal spawning cycles
+
+**ACEAS Model Requirements:**
+- High-resolution regional domain (East Antarctica)
+- Coupled ocean-biogeochemical-sea ice system
+- Multiple climate scenario ensemble
+- Observational data validation framework
+
+### B. Publication Strategy
+
+**Planned Manuscripts:**
+
+1. "Fish reproduction in size-spectrum marine ecosystem models: Implementation and validation in ZooMSS" - *Target: Ecological Modelling*
+2. "Long-term marine ecosystem projections under climate change: A ZooMSS perspective to 2300" - *Target: Global Change Biology*  
+3. "Regional impacts of climate change on East Antarctic marine ecosystems" - *Target: Antarctic Science*
+
+### C. Collaboration Network
+
+**ZooMSS Collaborations:**
+- FishMIP international network
+- University of Queensland research group
+- CMIP modeling community
+
+**ACEAS Partnerships:**
+- Antarctic Climate & Ecosystems CRC
+- Australian Antarctic Division
+- International Antarctic research community
