@@ -74,6 +74,34 @@ zoomss_run <- function(model){
   dynam_mortkernel <- model$dynam_mortkernel
   dynam_diffkernel <- model$dynam_diffkernel
 
+  # REPRODUCTION ADD: Source reproduction functions first
+  if(file.exists("R/zoomss_reproduction.R")) {
+    source("R/zoomss_reproduction.R")
+  }
+
+  # REPRODUCTION ADD: Initialize reproduction arrays with correct dimensions
+  repro_energy <- matrix(0, nrow = ngrps, ncol = ngrid)  # Current timestep only (groups x size)
+  maturity_ogive <- matrix(0, nrow = ngrps, ncol = ngrid)  # groups x size
+  repro_invest <- matrix(0, nrow = ngrps, ncol = ngrid)   # groups x size
+  
+  # Initialize SSB tracking (fish_groups x time_saved)  
+  SSB_tracking <- matrix(0, nrow = length(fish_grps), ncol = param$nsave)
+  
+  # REPRODUCTION ADD: Initialize recruitment parameters
+  if(length(fish_grps) > 0) {
+    # Check if reproduction is enabled for any fish group
+    reproduction_enabled <- any(param$Groups$Repro[fish_grps] > 0)
+    if(reproduction_enabled) {
+      recruit_params <- initialize_recruitment_params(param$Groups, fish_grps, model$N[1,,], w)
+      message("Fish reproduction enabled for ", length(fish_grps), " fish groups")
+    } else {
+      reproduction_enabled <- FALSE
+      message("Fish reproduction disabled - using fixed recruitment")
+    }
+  } else {
+    reproduction_enabled <- FALSE
+  }
+
   # Get pre-calculated phytoplankton and temperature time series from param
   phyto_int <- param$phyto_int
   phyto_slope <- param$phyto_slope
@@ -172,6 +200,39 @@ zoomss_run <- function(model){
 
     gg <- current_ingested_phyto + cs
 
+    # REPRODUCTION ADD: Calculate reproductive allocation for fish
+    # Calculate net production (growth + potential reproduction)
+    net_production <- current_ingested_phyto + cs
+    
+    # Initialize growth as full net production
+    gg <- net_production  
+    
+    # Clear previous reproductive energy
+    repro_energy[] <- 0
+    
+    if(reproduction_enabled) {
+      for(i in seq_along(fish_grps)) {
+        grp <- fish_grps[i]
+        
+        # Calculate maturity ogive
+        maturity_ogive[grp,] <- calculate_maturity_ogive(w, param$Groups$Wmat[grp])
+        
+        # Calculate size-dependent reproductive investment
+        repro_invest[grp,] <- calculate_reproductive_investment(
+          w, 
+          param$Groups$ReproInvest[grp], 
+          param$Groups$ReproExp[grp], 
+          param$Groups$Wmat[grp]
+        )
+        
+        # Calculate reproductive energy (from net production)
+        repro_energy[grp,] <- net_production[grp,] * repro_invest[grp,] * maturity_ogive[grp,]
+        
+        # Reduce growth by reproductive allocation  
+        gg[grp,] <- net_production[grp,] * (1 - repro_invest[grp,] * maturity_ogive[grp,])
+      }
+    }
+
     ### DO MORTALITY
 
     sw2 <- sweep(dynam_mortkernel, c(2,3), predation_multiplier, '*') # n_sizes x n_species x n_sizes
@@ -211,20 +272,33 @@ zoomss_run <- function(model){
     #### Keep smallest fish community size class as equal to equivalent zooplankton size class
     ### Keep smallest zooplankton size class abundnace for each group locked to others in size spectrum
     if(length(param$zoo_grps) > 1){ # If you only have one zoo group, it will be locked to phyto spectrum so you do not need to do this
-      for(i in 1:length(w0idx)){
+      for(i in seq_along(w0idx)){
         w_min_curr <- w0mins[i]
         exclude_mins <- w0idx[which(w0mins == w_min_curr)]
         N[w0idx[i], w_min_curr] <- props_z[i] * sum(N[-exclude_mins, w_min_curr])
       }
     }
 
+    # REPRODUCTION ADD: Dynamic fish recruitment (replace fixed boundary condition)
     fish_mins <- unlist(lapply(W0[fish_grps],
                                function(x){which(round(log10(w), digits = 2) == x)}))
-
-    if(length(fish_grps) > 1 & length(param$zoo_grps) > 1){
-      N[fish_grps,fish_mins] <- (1/length(fish_grps))*(colSums(N[-fish_grps,fish_mins]))
-    }else{
-      N[fish_grps, fish_mins] <- (1/length(fish_grps))*sum(N[-fish_grps, fish_mins])
+    
+    if(length(fish_grps) > 0) {
+      if(reproduction_enabled) {
+        # Calculate current SSB for recruitment
+        current_SSB <- calculate_spawning_stock_biomass(N, repro_energy, w, fish_grps)
+        
+        # Update recruitment based on SSB
+        N <- update_fish_recruitment(N, current_SSB, param$Groups, fish_grps, w, 
+                                    recruit_params, method = "beverton_holt")
+      } else {
+        # Original fixed recruitment (fallback)
+        if(length(fish_grps) > 1 && length(param$zoo_grps) > 1){
+          N[fish_grps,fish_mins] <- (1/length(fish_grps))*(colSums(N[-fish_grps,fish_mins]))
+        } else {
+          N[fish_grps, fish_mins] <- (1/length(fish_grps))*sum(N[-fish_grps, fish_mins])
+        }
+      }
     }
 
 
@@ -264,8 +338,25 @@ zoomss_run <- function(model){
       model$diet[isav,,1:3] <- cbind(pico_phyto_diet, nano_phyto_diet, micro_phyto_diet)
       model$diet[isav,,c(4:(dim(param$Groups)[1]+3))] <- dynam_diet
 
+      # REPRODUCTION ADD: Save reproduction diagnostics (if enabled)
+      if(reproduction_enabled) {
+        # Calculate SSB for this time step
+        current_SSB <- calculate_spawning_stock_biomass(N, repro_energy, w, fish_grps)
+        SSB_tracking[, isav] <- current_SSB
+      }
+
     }
   } # End of time loop
+  
+  # REPRODUCTION ADD: Add reproduction outputs to model object (if enabled)
+  if(reproduction_enabled) {
+    model$SSB <- SSB_tracking
+    model$reproduction_enabled <- TRUE
+    message("Fish reproduction completed successfully")
+  } else {
+    model$reproduction_enabled <- FALSE
+  }
+  
   return(model)
 
 }
