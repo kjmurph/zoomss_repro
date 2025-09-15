@@ -1,0 +1,101 @@
+# Modifications for zoomss_run.R
+# ================================
+# This file contains the key modifications needed for zoomss_run.R
+# Search for these sections in your existing file and add the REPRODUCTION ADD sections
+
+# 1. After parameter extraction (around line 30), add:
+# =========================================================
+
+  # REPRODUCTION ADD: Initialize reproduction arrays
+  repro_energy <- matrix(0, nrow = ngrps, ncol = ngrid)
+  SSB <- matrix(0, nrow = length(fish_grps), ncol = param$nsave)
+  maturity_ogive <- matrix(0, nrow = ngrps, ncol = ngrid)
+  repro_invest <- matrix(0, nrow = ngrps, ncol = ngrid)
+  
+  # REPRODUCTION ADD: Source reproduction functions (ensure this file is in R/ directory)
+  if(file.exists("R/zoomss_reproduction.R")) {
+    source("R/zoomss_reproduction.R")
+  }
+  
+  # REPRODUCTION ADD: Initialize recruitment parameters
+  if(length(fish_grps) > 0) {
+    recruit_params <- initialize_recruitment_params(param$Groups, fish_grps, model$N[1,,], w)
+  }
+
+# 2. After growth calculation (around line 115-135), replace gg calculation with:
+# ==================================================================================
+
+    # Calculate net production (implicit metabolism already in assim_eff)
+    net_production <- current_ingested_phyto + cs
+    
+    # REPRODUCTION ADD: Calculate reproductive allocation for fish
+    gg <- net_production  # Initialize growth as net production
+    
+    if(length(fish_grps) > 0 && param$Groups$Repro[fish_grps[1]] > 0) {
+      for(i in seq_along(fish_grps)) {
+        grp <- fish_grps[i]
+        
+        # Calculate maturity ogive
+        maturity_ogive[grp,] <- calculate_maturity_ogive(w, param$Groups$Wmat[grp])
+        
+        # Calculate size-dependent reproductive investment
+        repro_invest[grp,] <- calculate_reproductive_investment(
+          w, 
+          param$Groups$ReproInvest[grp], 
+          param$Groups$ReproExp[grp], 
+          param$Groups$Wmat[grp]
+        )
+        
+        # Calculate reproductive energy (from net production)
+        repro_energy[grp,] <- net_production[grp,] * repro_invest[grp,] * maturity_ogive[grp,]
+        
+        # Reduce growth by reproductive allocation
+        gg[grp,] <- net_production[grp,] * (1 - repro_invest[grp,] * maturity_ogive[grp,])
+      }
+      
+      # Calculate SSB for recruitment
+      SSB[, max(1, floor(itime * param$isave / param$ntime))] <- 
+        calculate_spawning_stock_biomass(N, repro_energy, w, fish_grps)
+    }
+
+# 3. Replace fish boundary condition section (around line 260-280) with:
+# =======================================================================
+
+    # REPRODUCTION ADD: Dynamic fish recruitment (replace fixed boundary condition)
+    fish_mins <- unlist(lapply(W0[fish_grps],
+                               function(x){which(round(log10(w), digits = 2) == x)}))
+    
+    if(length(fish_grps) > 0) {
+      if(param$Groups$Repro[fish_grps[1]] > 0) {
+        # Use dynamic recruitment based on SSB
+        current_SSB <- SSB[, max(1, floor(itime * param$isave / param$ntime))]
+        N <- update_fish_recruitment(N, current_SSB, param$Groups, fish_grps, w, 
+                                    recruit_params, method = "beverton_holt")
+      } else {
+        # Original fixed recruitment (fallback)
+        if(length(fish_grps) > 1 & length(param$zoo_grps) > 1){
+          N[fish_grps,fish_mins] <- (1/length(fish_grps))*(colSums(N[-fish_grps,fish_mins]))
+        } else {
+          N[fish_grps, fish_mins] <- (1/length(fish_grps))*sum(N[-fish_grps, fish_mins])
+        }
+      }
+    }
+
+# 4. In the save results section, add reproduction diagnostics:
+# ==============================================================
+
+      # REPRODUCTION ADD: Save reproduction diagnostics
+      if(length(fish_grps) > 0 && param$Groups$Repro[fish_grps[1]] > 0) {
+        model$repro_energy[isav,,] <- repro_energy
+        model$SSB[,isav] <- SSB[,isav]
+      }
+
+# 5. At the end of the function before return, add:
+# ==================================================
+
+  # REPRODUCTION ADD: Add reproduction outputs to model object
+  if(length(fish_grps) > 0 && param$Groups$Repro[fish_grps[1]] > 0) {
+    model$repro_energy <- repro_energy
+    model$SSB <- SSB
+  }
+

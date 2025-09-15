@@ -1,0 +1,23 @@
+# Modifications for zoomss_setup.R
+# =================================
+# Add these sections to your existing zoomss_setup.R file
+
+# After the model list is created (after model <- list(...)), add:
+# =================================================================
+
+  # REPRODUCTION ADD: Initialize reproduction tracking arrays if fish reproduction is enabled
+  if(length(param$fish_grps) > 0 && param$Groups$Repro[param$fish_grps[1]] > 0) {
+    
+    # Add reproduction-specific arrays to model object
+    model$repro_energy <- array(NA, dim = c(param$nsave, param$ngrps, param$ngrid))
+    model$SSB <- array(NA, dim = c(length(param$fish_grps), param$nsave))
+    
+    message("Fish reproduction enabled - initialized tracking arrays")
+  }
+  
+  # REPRODUCTION ADD: Source reproduction functions
+  # Ensure the reproduction functions are available
+  if(file.exists("R/zoomss_reproduction.R")) {
+    source("R/zoomss_reproduction.R")
+  }
+

@@ -1,0 +1,117 @@
+# CORRECTED Modifications for zoomss_run.R
+# ==========================================
+# This file contains CORRECTED modifications needed for zoomss_run.R
+# The original generated file had several array dimension issues
+
+# 1. After parameter extraction (around line 30), add:
+# =========================================================
+
+  # REPRODUCTION ADD: Source reproduction functions first
+  if(file.exists("R/zoomss_reproduction.R")) {
+    source("R/zoomss_reproduction.R")
+  }
+
+  # REPRODUCTION ADD: Initialize reproduction arrays with correct dimensions
+  repro_energy <- matrix(0, nrow = ngrps, ncol = ngrid)  # Current timestep only (groups x size)
+  maturity_ogive <- matrix(0, nrow = ngrps, ncol = ngrid)  # groups x size
+  repro_invest <- matrix(0, nrow = ngrps, ncol = ngrid)   # groups x size
+  
+  # Initialize SSB tracking (fish_groups x time_saved)  
+  SSB_tracking <- matrix(0, nrow = length(fish_grps), ncol = param$nsave)
+  
+  # REPRODUCTION ADD: Initialize recruitment parameters
+  if(length(fish_grps) > 0) {
+    # Check if reproduction is enabled for any fish group
+    reproduction_enabled <- any(param$Groups$Repro[fish_grps] > 0)
+    if(reproduction_enabled) {
+      recruit_params <- initialize_recruitment_params(param$Groups, fish_grps, model$N[1,,], w)
+      message("Fish reproduction enabled for ", length(fish_grps), " fish groups")
+    } else {
+      reproduction_enabled <- FALSE
+      message("Fish reproduction disabled - using fixed recruitment")
+    }
+  } else {
+    reproduction_enabled <- FALSE
+  }
+
+# 2. After growth calculation (around line 115-135), REPLACE the gg assignment with:
+# ===================================================================================
+
+    # Calculate net production (growth + potential reproduction)
+    net_production <- current_ingested_phyto + cs
+    
+    # REPRODUCTION ADD: Calculate reproductive allocation for fish
+    gg <- net_production  # Initialize growth as full net production
+    
+    # Clear previous reproductive energy
+    repro_energy[] <- 0
+    
+    if(reproduction_enabled) {
+      for(i in seq_along(fish_grps)) {
+        grp <- fish_grps[i]
+        
+        # Calculate maturity ogive
+        maturity_ogive[grp,] <- calculate_maturity_ogive(w, param$Groups$Wmat[grp])
+        
+        # Calculate size-dependent reproductive investment
+        repro_invest[grp,] <- calculate_reproductive_investment(
+          w, 
+          param$Groups$ReproInvest[grp], 
+          param$Groups$ReproExp[grp], 
+          param$Groups$Wmat[grp]
+        )
+        
+        # Calculate reproductive energy (from net production)
+        repro_energy[grp,] <- net_production[grp,] * repro_invest[grp,] * maturity_ogive[grp,]
+        
+        # Reduce growth by reproductive allocation  
+        gg[grp,] <- net_production[grp,] * (1 - repro_invest[grp,] * maturity_ogive[grp,])
+      }
+    }
+
+# 3. Replace fish boundary condition section (around line 220-230) with:
+# =======================================================================
+
+    # REPRODUCTION ADD: Dynamic fish recruitment (replace fixed boundary condition)
+    fish_mins <- unlist(lapply(W0[fish_grps],
+                               function(x){which(round(log10(w), digits = 2) == x)}))
+    
+    if(length(fish_grps) > 0) {
+      if(reproduction_enabled) {
+        # Calculate current SSB for recruitment
+        current_SSB <- calculate_spawning_stock_biomass(N, repro_energy, w, fish_grps)
+        
+        # Update recruitment based on SSB
+        N <- update_fish_recruitment(N, current_SSB, param$Groups, fish_grps, w, 
+                                    recruit_params, method = "beverton_holt")
+      } else {
+        # Original fixed recruitment (fallback)
+        if(length(fish_grps) > 1 & length(param$zoo_grps) > 1){
+          N[fish_grps,fish_mins] <- (1/length(fish_grps))*(colSums(N[-fish_grps,fish_mins]))
+        } else {
+          N[fish_grps, fish_mins] <- (1/length(fish_grps))*sum(N[-fish_grps, fish_mins])
+        }
+      }
+    }
+
+# 4. In the save results section (around line 250), add reproduction diagnostics:
+# ===============================================================================
+
+      # REPRODUCTION ADD: Save reproduction diagnostics (if enabled)
+      if(reproduction_enabled) {
+        # Calculate SSB for this time step
+        current_SSB <- calculate_spawning_stock_biomass(N, repro_energy, w, fish_grps)
+        SSB_tracking[, isav] <- current_SSB
+      }
+
+# 5. At the end of the function, before return (around line 275), add:
+# ====================================================================
+
+  # REPRODUCTION ADD: Add reproduction outputs to model object (if enabled)
+  if(reproduction_enabled) {
+    model$SSB <- SSB_tracking
+    model$reproduction_enabled <- TRUE
+    message("Fish reproduction completed successfully")
+  } else {
+    model$reproduction_enabled <- FALSE
+  }
