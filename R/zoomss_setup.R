@@ -102,9 +102,17 @@ zoomss_setup <- function(param){
     N = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # dynamic abundance spectrum
     Z = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Total mortality
     gg = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Growth
-    diet = array(NA, dim = c(param$nsave, c(param$ngrps), c(param$ngrps+3))) # diet
-
+    diet = array(NA, dim = c(param$nsave, c(param$ngrps), c(param$ngrps+3))), # diet
+    F_save = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)) # Fishing mortality (size-resolved)
   )
+  
+  # Add catch arrays based on save_catch_by_size setting
+  if (param$save_catch_by_size) {
+    model$catch_by_size_save <- array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)) # Catch by size
+    model$catch_save <- array(NA, dim = c(param$nsave, param$ngrps)) # Total catch by group
+  } else {
+    model$catch_save <- array(NA, dim = c(param$nsave, param$ngrps)) # Total catch by group only
+  }
 
   # Set phyto_theta for carnivores
   model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0 # Carnivorous groups can't eat phyto
@@ -127,9 +135,41 @@ zoomss_setup <- function(param){
   tempN[unlist(tapply(param$w_log10, seq_along(param$w), function(wx,Wmin) Wmin > wx, Wmin = param$Groups$W0))] <- 0
   model$N[1,,] <- tempN
 
-  # Fishing mortality (yr^-1)
-  for(g in 1:param$ngrps){
-    model$fish_mort[g,match(param$Groups$Fmort_W0[g], param$w_log10):match(param$Groups$Fmort_Wmax[g], param$w_log10)] <- param$Groups$Fmort[g]
+  # Fishing mortality setup
+  if (param$dynamic_fishing) {
+    # Dynamic fishing: pre-calculate selectivity matrix
+    model$selectivity <- matrix(0, nrow = param$ngrps, ncol = param$ngrid)
+    
+    for (g in 1:param$ngrps) {
+      sel_params <- param$selectivity_params[[g]]
+      
+      # Default log_scale to TRUE if not specified
+      if (is.null(sel_params$log_scale)) {
+        sel_params$log_scale <- TRUE
+      }
+      
+      # Calculate selectivity for this group
+      model$selectivity[g, ] <- calc_selectivity(
+        w = param$w_log10,
+        type = sel_params$type,
+        params = sel_params$params,
+        log_scale = sel_params$log_scale
+      )
+    }
+    
+    # Initialize fish_mort with first timestep (will be updated in run)
+    model$fish_mort <- calc_fishing_mortality(
+      effort = param$effort_ts[1],
+      q = param$catchability,
+      selectivity = model$selectivity
+    )
+    
+    cat("Dynamic fishing initialized with selectivity matrix\n")
+  } else {
+    # Static fishing: use Groups parameters (backward compatibility)
+    for(g in 1:param$ngrps){
+      model$fish_mort[g,match(param$Groups$Fmort_W0[g], param$w_log10):match(param$Groups$Fmort_Wmax[g], param$w_log10)] <- param$Groups$Fmort[g]
+    }
   }
 
   ### MATRICES FOR LOG TRANSFORM OF EQUATION (these don't change with environment)

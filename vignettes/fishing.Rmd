@@ -1,0 +1,339 @@
+---
+title: "Fishing Mortality in ZooMSS"
+vignette: >
+  %\VignetteIndexEntry{fishing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+options(rmarkdown.html_vignette.check_title = FALSE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r setup, message=FALSE, warning=FALSE}
+library(zoomss)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+```
+
+## Introduction
+
+ZooMSS supports both **static** and **dynamic** fishing mortality, allowing you to simulate the effects of fishing on marine ecosystems. This vignette demonstrates how to:
+
+1. Use static fishing mortality (simple, constant F)
+2. Implement dynamic fishing with time-varying effort
+3. Apply different selectivity patterns (knife-edge, logistic)
+4. Analyze fishing outputs (F, catch, size structure)
+5. Compare management scenarios
+
+## Static Fishing Mortality
+
+The simplest approach uses constant fishing mortality specified in the Groups dataframe.
+
+```{r}
+# Get default groups
+Groups <- getGroups()
+
+# Set static fishing mortality for group 1 (small copepods)
+Groups$Fmort[1] <- 0.2  # Fishing mortality rate (yr^-1)
+Groups$Fmort_W0[1] <- Groups$W0[1]  # Start of fished size range
+Groups$Fmort_Wmax[1] <- Groups$Wmax[1]  # End of fished size range
+
+# Create environmental data (10 years, monthly timesteps)
+env_data <- createInputParams(
+  time = seq(0, 10, by = 1/12),
+  sst = 15,
+  chl = 0.5
+)
+
+# Run model (no fishing_params = static fishing)
+mdl_static <- zoomss_model(env_data, Groups, isave = 12)
+```
+
+### Examining Static Fishing Outputs
+
+```{r}
+# Fishing mortality is constant over time
+plot(mdl_static$time, mdl_static$fishing_mortality[, 1, 50], 
+     type = "l", xlab = "Time (years)", ylab = "F (1/yr)",
+     main = "Static fishing mortality - Group 1, size class 50")
+
+# Total catch over time
+plot(mdl_static$time, mdl_static$catch[, 1],
+     type = "l", xlab = "Time (years)", ylab = "Catch (g)",
+     main = "Catch from static fishing - Group 1")
+```
+
+## Dynamic Fishing Mortality
+
+Dynamic fishing allows time-varying effort with size-based selectivity, providing more realistic fisheries scenarios.
+
+### Example 1: Increasing Effort with Knife-Edge Selectivity
+
+```{r}
+# Create fishing parameters
+ngrps <- nrow(Groups)
+n_steps <- nrow(env_data)
+
+# Linearly increasing effort over time
+effort <- seq(0, 200, length.out = n_steps)
+
+# Catchability coefficients (fishing efficiency)
+catchability <- c(0.01, 0.015, 0.02, 0.01, 0.01, 0.01, 0.01)
+
+# Knife-edge selectivity: fully vulnerable above threshold
+selectivity <- vector("list", ngrps)
+for (g in 1:ngrps) {
+  # Set threshold at 50% of size range
+  w_threshold <- (Groups$W0[g] + Groups$Wmax[g]) / 2
+  
+  selectivity[[g]] <- list(
+    type = "knife_edge",
+    params = list(w_min = w_threshold),
+    log_scale = TRUE
+  )
+}
+
+fishing_params <- list(
+  effort = effort,
+  catchability = catchability,
+  selectivity = selectivity
+)
+
+# Run model with dynamic fishing
+mdl_dynamic <- zoomss_model(env_data, Groups, isave = 12, 
+                           fishing_params = fishing_params)
+```
+
+### Visualizing Dynamic Fishing
+
+```{r}
+# Plot effort over time
+plot(env_data$time, effort, type = "l",
+     xlab = "Time (years)", ylab = "Effort",
+     main = "Fishing effort trajectory")
+
+# Plot fishing mortality for different groups
+matplot(mdl_dynamic$time, mdl_dynamic$fishing_mortality[, 1:3, 50],
+        type = "l", lty = 1, col = 1:3,
+        xlab = "Time (years)", ylab = "F (1/yr)",
+        main = "Fishing mortality by group (size class 50)")
+legend("topleft", legend = paste("Group", 1:3), col = 1:3, lty = 1)
+
+# Plot total catch across all groups
+total_catch <- rowSums(mdl_dynamic$catch)
+plot(mdl_dynamic$time, total_catch, type = "l",
+     xlab = "Time (years)", ylab = "Total catch (g)",
+     main = "Total catch - all groups")
+```
+
+### Example 2: Logistic Selectivity (Gradual Vulnerability)
+
+Logistic selectivity provides a smooth transition in vulnerability, typical of gillnets and hooks.
+
+```{r}
+# Create logistic selectivity for each group
+selectivity_logistic <- vector("list", ngrps)
+for (g in 1:ngrps) {
+  # 50% selectivity at midpoint, 95% at 75% of size range
+  L50 <- (Groups$W0[g] + Groups$Wmax[g]) / 2
+  L95 <- Groups$W0[g] + 0.75 * (Groups$Wmax[g] - Groups$W0[g])
+  
+  selectivity_logistic[[g]] <- list(
+    type = "logistic",
+    params = list(L50 = L50, L95 = L95),
+    log_scale = TRUE
+  )
+}
+
+fishing_params_logistic <- list(
+  effort = rep(150, n_steps),  # Constant effort
+  catchability = catchability,
+  selectivity = selectivity_logistic
+)
+
+mdl_logistic <- zoomss_model(env_data, Groups, isave = 12,
+                             fishing_params = fishing_params_logistic)
+```
+
+### Comparing Selectivity Patterns
+
+```{r}
+# Calculate selectivity curves for group 1
+w_log10 <- mdl_dynamic$param$w_log10
+
+# Knife-edge selectivity
+w_threshold <- (Groups$W0[1] + Groups$Wmax[1]) / 2
+sel_knife <- calc_selectivity(w_log10, "knife_edge", 
+                               list(w_min = w_threshold))
+
+# Logistic selectivity
+L50 <- (Groups$W0[1] + Groups$Wmax[1]) / 2
+L95 <- Groups$W0[1] + 0.75 * (Groups$Wmax[1] - Groups$W0[1])
+sel_logistic <- calc_selectivity(w_log10, "logistic",
+                                 list(L50 = L50, L95 = L95))
+
+# Plot comparison
+plot(w_log10, sel_knife, type = "l", lwd = 2, col = "blue",
+     xlab = "log10(mass in g)", ylab = "Selectivity",
+     main = "Selectivity patterns - Group 1", ylim = c(0, 1))
+lines(w_log10, sel_logistic, lwd = 2, col = "red")
+abline(v = c(L50, L95), col = "red", lty = 2)
+abline(v = w_threshold, col = "blue", lty = 2)
+legend("right", legend = c("Knife-edge", "Logistic", "L50", "L95/threshold"),
+       col = c("blue", "red", "red", "blue"), lty = c(1, 1, 2, 2), lwd = c(2, 2, 1, 1))
+```
+
+## Size-Resolved Catch Analysis
+
+Use `save_catch_by_size = TRUE` to analyze the size structure of catches.
+
+```{r}
+# Run with size-resolved catch
+mdl_size <- zoomss_model(env_data, Groups, isave = 12,
+                        fishing_params = fishing_params,
+                        save_catch_by_size = TRUE)
+```
+
+### Catch Size Spectra
+
+```{r}
+# Plot catch by size for final timestep
+final_t <- nrow(mdl_size$catch_by_size)
+w_log10 <- mdl_size$param$w_log10
+
+# Plot for first 3 groups
+matplot(w_log10, t(mdl_size$catch_by_size[final_t, 1:3, ]),
+        type = "l", lty = 1, lwd = 2, col = 1:3,
+        xlab = "log10(mass in g)", ylab = "Catch (g)",
+        main = "Catch size spectra - Final year")
+legend("topright", legend = paste("Group", 1:3), col = 1:3, lty = 1, lwd = 2)
+```
+
+### Verify Catch Summation
+
+```{r}
+# Size-resolved catch should sum to total catch
+for (g in 1:3) {
+  size_sum <- sum(mdl_size$catch_by_size[final_t, g, ], na.rm = TRUE)
+  total <- mdl_size$catch[final_t, g]
+  cat(sprintf("Group %d: Size sum = %.6f, Total = %.6f, Diff = %.2e\n",
+              g, size_sum, total, abs(size_sum - total)))
+}
+```
+
+## Management Scenario Comparison
+
+Compare different fishing scenarios to evaluate management strategies.
+
+```{r}
+# Scenario 1: No fishing
+mdl_none <- zoomss_model(env_data, Groups, isave = 12)
+
+# Scenario 2: Low constant effort
+fishing_low <- list(
+  effort = rep(50, n_steps),
+  catchability = catchability,
+  selectivity = selectivity
+)
+mdl_low <- zoomss_model(env_data, Groups, isave = 12, 
+                       fishing_params = fishing_low)
+
+# Scenario 3: High constant effort
+fishing_high <- list(
+  effort = rep(200, n_steps),
+  catchability = catchability,
+  selectivity = selectivity
+)
+mdl_high <- zoomss_model(env_data, Groups, isave = 12,
+                        fishing_params = fishing_high)
+
+# Scenario 4: Increasing effort (as before)
+mdl_increase <- mdl_dynamic
+```
+
+### Compare Biomass Trajectories
+
+```{r}
+# Extract total biomass over time for group 1
+biomass_none <- rowSums(mdl_none$biomass[, 1, ])
+biomass_low <- rowSums(mdl_low$biomass[, 1, ])
+biomass_high <- rowSums(mdl_high$biomass[, 1, ])
+biomass_increase <- rowSums(mdl_increase$biomass[, 1, ])
+
+# Plot comparison
+plot(mdl_none$time, biomass_none, type = "l", lwd = 2, col = "green",
+     xlab = "Time (years)", ylab = "Biomass (g)", ylim = c(0, max(biomass_none)),
+     main = "Biomass trajectories - Group 1")
+lines(mdl_low$time, biomass_low, lwd = 2, col = "blue")
+lines(mdl_high$time, biomass_high, lwd = 2, col = "red")
+lines(mdl_increase$time, biomass_increase, lwd = 2, col = "orange")
+legend("topright", 
+       legend = c("No fishing", "Low effort", "High effort", "Increasing effort"),
+       col = c("green", "blue", "red", "orange"), lwd = 2)
+```
+
+### Compare Catch Yields
+
+```{r}
+# Calculate cumulative catch
+cum_catch_low <- cumsum(rowSums(mdl_low$catch))
+cum_catch_high <- cumsum(rowSums(mdl_high$catch))
+cum_catch_increase <- cumsum(rowSums(mdl_increase$catch))
+
+plot(mdl_low$time, cum_catch_low, type = "l", lwd = 2, col = "blue",
+     xlab = "Time (years)", ylab = "Cumulative catch (g)",
+     main = "Cumulative catch across all groups")
+lines(mdl_high$time, cum_catch_high, lwd = 2, col = "red")
+lines(mdl_increase$time, cum_catch_increase, lwd = 2, col = "orange")
+legend("topleft",
+       legend = c("Low effort", "High effort", "Increasing effort"),
+       col = c("blue", "red", "orange"), lwd = 2)
+```
+
+### Sustainability Metrics
+
+```{r}
+# Calculate final biomass relative to unfished
+final_biomass <- data.frame(
+  Scenario = c("No fishing", "Low effort", "High effort", "Increasing effort"),
+  Group1_biomass = c(tail(biomass_none, 1), tail(biomass_low, 1),
+                     tail(biomass_high, 1), tail(biomass_increase, 1)),
+  Total_catch = c(0, tail(cum_catch_low, 1), 
+                  tail(cum_catch_high, 1), tail(cum_catch_increase, 1))
+)
+
+final_biomass$Depletion <- 1 - final_biomass$Group1_biomass / final_biomass$Group1_biomass[1]
+final_biomass$Catch_per_depletion <- final_biomass$Total_catch / 
+  (final_biomass$Depletion + 0.001)  # Avoid division by zero
+
+print(final_biomass)
+```
+
+## Key Takeaways
+
+1. **Static vs Dynamic**: Static fishing is simpler but less realistic; dynamic fishing allows time-varying effort and size selectivity.
+
+2. **Selectivity Matters**: Knife-edge selectivity protects small individuals completely; logistic selectivity is more realistic for many gears.
+
+3. **Size-Resolved Catch**: Use `save_catch_by_size = TRUE` when you need detailed catch size structure analysis (at cost of increased memory).
+
+4. **Trade-offs**: Higher fishing effort increases catches but depletes biomass, potentially reducing long-term yields.
+
+5. **Model Outputs**:
+   - `fishing_mortality`: F by group and size over time
+   - `catch`: Total catch biomass by group
+   - `catch_by_size`: Size-resolved catch (optional)
+
+## Further Reading
+
+- See `?zoomss_model` for complete parameter documentation
+- See `?calc_selectivity` for selectivity function details
+- See `?calc_fishing_mortality` and `?calc_catch` for calculation methods

@@ -4,7 +4,13 @@
 \alias{zoomss_model}
 \title{Main ZooMSS model function for complete simulations}
 \usage{
-zoomss_model(input_params, Groups = NULL, isave = 1)
+zoomss_model(
+  input_params,
+  Groups = NULL,
+  isave = 1,
+  fishing_params = NULL,
+  save_catch_by_size = FALSE
+)
 }
 \arguments{
 \item{input_params}{Data frame containing model parameters and environmental time series.
@@ -18,6 +24,23 @@ If NULL, uses default ZooMSS functional groups. Can be obtained/customized using
 getGroups().}
 
 \item{isave}{Save frequency in time steps (default: 10)}
+
+\item{fishing_params}{Optional list specifying dynamic fishing mortality. If NULL (default),
+uses static fishing mortality from Groups$Fmort. If provided, must contain:
+\itemize{
+\item effort: numeric vector of fishing effort time series (length = nrow(input_params))
+\item catchability: named numeric vector of catchability coefficients (q) for each group
+\item selectivity: list with named elements for each group, each containing:
+\itemize{
+\item type: "knife_edge", "logistic", or "custom"
+\item params: list of parameters (e.g., list(w_min = 1.0) for knife_edge)
+\item log_scale: TRUE (default) if params are in log10 grams
+}
+}}
+
+\item{save_catch_by_size}{Logical, if TRUE saves size-resolved catch (nsave x ngrps x ngrid),
+if FALSE (default) saves only total catch by group (nsave x ngrps). Size-resolved catch
+provides detailed information about catch size structure but increases memory usage.}
 }
 \value{
 Complete ZooMSS model results object containing:

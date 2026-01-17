@@ -2,6 +2,9 @@
 
 export("%>%")
 export(averageTimeSeries)
+export(calc_catch)
+export(calc_fishing_mortality)
+export(calc_selectivity)
 export(calculatePhytoParam)
 export(createEnviroData)
 export(createInputParams)

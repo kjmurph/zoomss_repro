@@ -23,6 +23,21 @@
 #'   If NULL, uses default ZooMSS functional groups. Can be obtained/customized using
 #'   getGroups().
 #' @param isave Save frequency in time steps (default: 10)
+#' @param fishing_params Optional list specifying dynamic fishing mortality. If NULL (default),
+#'   uses static fishing mortality from Groups$Fmort. If provided, must contain:
+#'   \itemize{
+#'     \item effort: numeric vector of fishing effort time series (length = nrow(input_params))
+#'     \item catchability: named numeric vector of catchability coefficients (q) for each group
+#'     \item selectivity: list with named elements for each group, each containing:
+#'       \itemize{
+#'         \item type: "knife_edge", "logistic", or "custom"
+#'         \item params: list of parameters (e.g., list(w_min = 1.0) for knife_edge)
+#'         \item log_scale: TRUE (default) if params are in log10 grams
+#'       }
+#'   }
+#' @param save_catch_by_size Logical, if TRUE saves size-resolved catch (nsave x ngrps x ngrid),
+#'   if FALSE (default) saves only total catch by group (nsave x ngrps). Size-resolved catch
+#'   provides detailed information about catch size structure but increases memory usage.
 #'
 #' @return Complete ZooMSS model results object containing:
 #'   \itemize{
@@ -53,7 +68,7 @@
 #' results <- zoomss_model(input_params, custom_groups)
 #' }
 #'
-zoomss_model <- function(input_params, Groups = NULL, isave = 1){
+zoomss_model <- function(input_params, Groups = NULL, isave = 1, fishing_params = NULL, save_catch_by_size = FALSE){
 
   # Handle default Groups parameter
   if (is.null(Groups)) {
@@ -73,7 +88,7 @@ zoomss_model <- function(input_params, Groups = NULL, isave = 1){
   }
 
   ################### RUN THE MODEL ###################
-  param <- zoomss_params(Groups, input_params, isave) # Set up parameter list
+  param <- zoomss_params(Groups, input_params, isave, fishing_params, save_catch_by_size) # Set up parameter list
   model <- zoomss_setup(param) # Set up model equation stuff
   model_output <- zoomss_run(model) # Run the model
 
@@ -84,7 +99,17 @@ zoomss_model <- function(input_params, Groups = NULL, isave = 1){
   }
 
   model_output <- model_output %>%
-    my_rename(abundance = "N", growth = "gg", mortality = "Z") # Make variables more easily readable
+    my_rename(abundance = "N", growth = "gg", mortality = "Z", 
+              fishing_mortality = "F_save") # Make variables more easily readable
+  
+  # Rename catch outputs based on save_catch_by_size setting
+  if (param$save_catch_by_size) {
+    model_output <- model_output %>%
+      my_rename(catch_by_size = "catch_by_size_save", catch = "catch_save")
+  } else {
+    model_output <- model_output %>%
+      my_rename(catch = "catch_save")
+  }
 
   model_output$biomass = getBiomass(model_output, units = "ww")
   model_output$biomassC <- getBiomass(model_output, units = "carbon")

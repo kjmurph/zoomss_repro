@@ -158,6 +158,16 @@ zoomss_run <- function(model){
     # Update senescence mortality with current temperature effects (no compounding - always from base)
     model$M_sb <- model$M_sb_base * model$temp_eff
 
+    # Update fishing mortality if dynamic fishing is enabled
+    if (model$param$dynamic_fishing) {
+      model$fish_mort <- calc_fishing_mortality(
+        effort = model$param$effort_ts[itime],
+        q = model$param$catchability,
+        selectivity = model$selectivity
+      )
+    }
+    # Otherwise fish_mort remains at the static value set in setup
+
     # Calculate multipliers for growth, predation, and diffusion
     growth_multiplier <- colSums(N * assim_eff) # 1 x n_sizes
     predation_multiplier <- N * model$temp_eff # n_species x n_sizes (now using updated temp_eff)
@@ -260,6 +270,41 @@ zoomss_run <- function(model){
       model$N[isav,,] <- N # Save N by taxa and size
       model$Z[isav,,] <-  Z ## Save mortality
       model$gg[isav,,] <-  gg ## Save growth
+      
+      # Save fishing mortality (current F for all groups and sizes)
+      model$F_save[isav,,] <- model$fish_mort
+      
+      # Calculate and save catch for this timestep
+      if (param$save_catch_by_size) {
+        # Save size-resolved catch
+        model$catch_by_size_save[isav,,] <- calc_catch(
+          F_w = model$fish_mort,
+          N_w = N,
+          w = param$w,
+          dw = param$dx,
+          dt = param$dt,
+          by_size = TRUE  # Size-resolved catch
+        )
+        # Also save total catch (sum across sizes)
+        model$catch_save[isav,] <- calc_catch(
+          F_w = model$fish_mort,
+          N_w = N,
+          w = param$w,
+          dw = param$dx,
+          dt = param$dt,
+          by_size = FALSE  # Total catch by group
+        )
+      } else {
+        # Save only total catch by group
+        model$catch_save[isav,] <- calc_catch(
+          F_w = model$fish_mort,
+          N_w = N,
+          w = param$w,
+          dw = param$dx,
+          dt = param$dt,
+          by_size = FALSE  # Total catch by group
+        )
+      }
 
       model$diet[isav,,1:3] <- cbind(pico_phyto_diet, nano_phyto_diet, micro_phyto_diet)
       model$diet[isav,,c(4:(dim(param$Groups)[1]+3))] <- dynam_diet

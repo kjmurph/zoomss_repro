@@ -26,6 +26,15 @@
 #'   time (time vector in years), sst (sea surface temperature), and chl (chlorophyll).
 #'   The time vector can start at any value and the model automatically calculates dt (time step) and tmax (maximum time).
 #' @param isave Save frequency in time steps (default: 50)
+#' @param fishing_params Optional list specifying dynamic fishing mortality. If NULL (default),
+#'   uses static fishing mortality from Groups$Fmort. If provided, must contain:
+#'   - effort: numeric vector of fishing effort time series (length = nrow(input_params))
+#'   - catchability: named numeric vector of catchability coefficients (q) for each group
+#'   - selectivity: list with named elements for each group, each containing:
+#'     - type: "knife_edge", "logistic", or "custom"
+#'     - params: list of parameters (e.g., list(w_min = 1.0) for knife_edge)
+#'     - log_scale: TRUE (default) if params are in log10 grams
+#' @param save_catch_by_size Logical, if TRUE saves size-resolved catch, if FALSE saves total catch only
 #'
 #' @return List containing comprehensive model parameters:
 #'   \itemize{
@@ -55,7 +64,7 @@
 #'
 #' @noRd
 #'
-zoomss_params <- function(Groups, input_params, isave){
+zoomss_params <- function(Groups, input_params, isave, fishing_params = NULL, save_catch_by_size = FALSE){
 
   # Calculate dt and tmax from time column in input_params
   time_values <- input_params$time
@@ -149,6 +158,39 @@ zoomss_params <- function(Groups, input_params, isave){
     param2$temp_eff_zoo[,] <- temp_factor # preallocated above for all groups
     param2$temp_eff_fish[,] <- temp_factor # preallocated above for all groups
   }
+
+  # Process fishing parameters (effort time series and selectivity)
+  if (!is.null(fishing_params)) {
+    # Validate fishing_params structure
+    if (!all(c("effort", "catchability", "selectivity") %in% names(fishing_params))) {
+      stop("fishing_params must contain 'effort', 'catchability', and 'selectivity' elements")
+    }
+    
+    # Validate effort time series length
+    if (length(fishing_params$effort) != n_time_steps) {
+      stop("Fishing effort time series length (", length(fishing_params$effort), 
+           ") does not match input_params rows (", n_time_steps, ")")
+    }
+    
+    # Validate catchability vector
+    if (length(fishing_params$catchability) != param$ngrps) {
+      stop("Catchability vector length (", length(fishing_params$catchability),
+           ") does not match number of groups (", param$ngrps, ")")
+    }
+    
+    # Store effort time series
+    param2$effort_ts <- as.numeric(fishing_params$effort)
+    param2$catchability <- as.numeric(fishing_params$catchability)
+    param2$selectivity_params <- fishing_params$selectivity
+    param2$dynamic_fishing <- TRUE
+    
+    cat("Dynamic fishing enabled with effort time series\n")
+  } else {
+    param2$dynamic_fishing <- FALSE
+  }
+  
+  # Store catch output preference
+  param2$save_catch_by_size <- save_catch_by_size
 
   # Store the maximum wMax_phyto from time series for grid creation
   param2$wMax_phyto <- max(param2$wMax_phyto)
