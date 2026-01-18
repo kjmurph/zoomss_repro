@@ -86,7 +86,13 @@ n_steps <- nrow(env_data)
 effort <- seq(0, 200, length.out = n_steps)
 
 # Catchability coefficients (fishing efficiency)
-catchability <- c(0.01, 0.015, 0.02, 0.01, 0.01, 0.01, 0.01)
+# In practice, typically only fish groups are targeted
+# Set catchability > 0 for fish groups (groups 10-12), 0 for others
+catchability <- rep(0, ngrps)
+catchability[10:12] <- c(0.015, 0.02, 0.01)  # Fish groups
+
+# Note: The framework supports fishing any group by setting catchability > 0
+# For example, to fish all groups equally: catchability <- rep(0.01, ngrps)
 
 # Knife-edge selectivity: fully vulnerable above threshold
 selectivity <- vector("list", ngrps)
