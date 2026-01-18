@@ -115,6 +115,12 @@ zoomss_run <- function(model){
   # Temporary Matrices that get updated each time step some of these saved for output
   N <- matrix(model$N[1,,], nrow = ngrps, ncol = ngrid) # Abundances of functional groups, dim 1 = groups, dim 2 = size classes
 
+  # Initialize catch accumulators (accumulate between save points)
+  catch_accumulator <- matrix(0, nrow = ngrps, ncol = 1)
+  if (param$save_catch_by_size) {
+    catch_by_size_accumulator <- matrix(0, nrow = ngrps, ncol = ngrid)
+  }
+
   pb <- progress::progress_bar$new(
     format = "ZooMSS Time Loop [:bar] :percent eta: :eta elapsed: :elapsed",
     total = itimemax,
@@ -238,6 +244,29 @@ zoomss_run <- function(model){
     }
 
 
+    # Accumulate catch every timestep (not just at save points)
+    current_catch <- calc_catch(
+      F_w = model$fish_mort,
+      N_w = N,
+      w = param$w,
+      dw = param$dx,
+      dt = dt,  # Use scalar dt
+      by_size = FALSE
+    )
+    catch_accumulator <- catch_accumulator + current_catch
+
+    if (param$save_catch_by_size) {
+      current_catch_by_size <- calc_catch(
+        F_w = model$fish_mort,
+        N_w = N,
+        w = param$w,
+        dw = param$dx,
+        dt = dt,
+        by_size = TRUE
+      )
+      catch_by_size_accumulator <- catch_by_size_accumulator + current_catch_by_size
+    }
+
     # Save results (at regular intervals AND always at the final time step):
     # Save output at regular intervals only
     save_this_step <- (itime %% param$isave) == 0
@@ -274,36 +303,13 @@ zoomss_run <- function(model){
       # Save fishing mortality (current F for all groups and sizes)
       model$F_save[isav,,] <- model$fish_mort
       
-      # Calculate and save catch for this timestep
+      # Save accumulated catch since last save point and reset accumulators
+      model$catch_save[isav,] <- catch_accumulator
+      catch_accumulator <- matrix(0, nrow = ngrps, ncol = 1)  # Reset
+      
       if (param$save_catch_by_size) {
-        # Save size-resolved catch
-        model$catch_by_size_save[isav,,] <- calc_catch(
-          F_w = model$fish_mort,
-          N_w = N,
-          w = param$w,
-          dw = param$dx,
-          dt = param$dt,
-          by_size = TRUE  # Size-resolved catch
-        )
-        # Also save total catch (sum across sizes)
-        model$catch_save[isav,] <- calc_catch(
-          F_w = model$fish_mort,
-          N_w = N,
-          w = param$w,
-          dw = param$dx,
-          dt = param$dt,
-          by_size = FALSE  # Total catch by group
-        )
-      } else {
-        # Save only total catch by group
-        model$catch_save[isav,] <- calc_catch(
-          F_w = model$fish_mort,
-          N_w = N,
-          w = param$w,
-          dw = param$dx,
-          dt = param$dt,
-          by_size = FALSE  # Total catch by group
-        )
+        model$catch_by_size_save[isav,,] <- catch_by_size_accumulator
+        catch_by_size_accumulator <- matrix(0, nrow = ngrps, ncol = ngrid)  # Reset
       }
 
       model$diet[isav,,1:3] <- cbind(pico_phyto_diet, nano_phyto_diet, micro_phyto_diet)
