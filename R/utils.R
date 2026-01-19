@@ -69,11 +69,24 @@ reduceAll = function(x, method = "sum") {
 #'   weight vector across size classes. Essential for analyses requiring biomass
 #'   units rather than abundance counts. Works with 3D arrays (time, groups, size_classes).
 #'   Can convert to either wet weight or carbon biomass units.
+#'   
+#'   **Important:** The returned biomass array is always 3D with dimensions [time, groups, size].
+#'   When subsetting, remember to include all three dimensions:
+#'   \itemize{
+#'     \item Correct: \code{biomass[t, g, ]} to get all sizes for time t and group g
+#'     \item Incorrect: \code{biomass[t, g]} will cause "incorrect number of dimensions" error
+#'   }
+#'   
+#'   To get total biomass for specific groups:
+#'   \itemize{
+#'     \item Single time point: \code{sum(biomass[t, groups, ])}
+#'     \item All time points: \code{apply(biomass[, groups, ], 1, sum)}
+#'   }
 #'
 #' @param mdl ZooMSS model object containing abundance array (N) and weight vector (param$w)
 #' @param units Character string specifying biomass units: "ww" for wet weight (default) or "carbon" for carbon biomass
 #'
-#' @return 3D array of biomass values with same dimensions as N. Units depend on the units parameter:
+#' @return 3D array of biomass values with dimensions [time, groups, size]. Units depend on the units parameter:
 #'   \itemize{
 #'     \item "ww": grams wet weight
 #'     \item "carbon": grams carbon
@@ -85,8 +98,12 @@ reduceAll = function(x, method = "sum") {
 #' # Run ZooMSS model
 #' results <- zoomss_model(input_params, Groups)
 #'
-#' # Convert abundances to wet weight biomass
+#' # Convert abundances to wet weight biomass (returns 3D array)
 #' biomass_ww <- getBiomass(results, units = "ww")
+#'
+#' # Get total fish biomass at final time step (groups 10-12)
+#' final_time <- dim(biomass_ww)[1]
+#' total_fish <- sum(biomass_ww[final_time, 10:12, ])  # Note the third comma!
 #'
 #' # Convert abundances to carbon biomass
 #' biomass_carbon <- getBiomass(results, units = "carbon")
@@ -101,7 +118,8 @@ getBiomass <- function(mdl, units = "ww") {
 
   # Check that N exists in the model
   if (!"abundance" %in% names(mdl)) {
-    stop("Abundance array 'N' not found in model output")
+    stop("Abundance array 'abundance' not found in model output. ",
+         "Make sure you're using output from zoomss_model().")
   }
 
   # Check that weights exist in model parameters
@@ -112,10 +130,17 @@ getBiomass <- function(mdl, units = "ww") {
   # Get abundance array and weights
   N <- mdl$abundance
   w <- mdl$param$w
+  
+  # Validate that N is 3D
+  if (length(dim(N)) != 3) {
+    stop("Abundance array must be 3D [time, groups, size], but has ", 
+         length(dim(N)), " dimensions: ", paste(dim(N), collapse = " x "))
+  }
 
   # Check dimensions match
   if (dim(N)[3] != length(w)) {
-    stop("Size dimension of abundance (", dim(N)[3], ") does not match length of weight vector (", length(w), ")")
+    stop("Size dimension of abundance (", dim(N)[3], 
+         ") does not match length of weight vector (", length(w), ")")
   }
 
   # Convert abundance to wet weight biomass by multiplying by weights across size dimension (3rd dimension)
@@ -130,11 +155,19 @@ getBiomass <- function(mdl, units = "ww") {
 
     # Check dimensions match
     if (dim(N)[2] != length(mdl$param$Groups$Carbon)) {
-      stop("Group dimension of N (", dim(N)[2], ") does not match length of carbon vector (", length(mdl$param$Groups$Carbon), ")")
+      stop("Group dimension of N (", dim(N)[2], 
+           ") does not match length of carbon vector (", length(mdl$param$Groups$Carbon), ")")
     }
 
     # Convert to carbon biomass by multiplying by carbon content across group dimension (2nd dimension)
     Biomass <- sweep(Biomass, 2, mdl$param$Groups$Carbon, '*')
+  }
+  
+  # Add informative message about output structure (only show once per session)
+  if (!isTRUE(getOption("zoomss.biomass.msg.shown"))) {
+    message("Note: Biomass array has dimensions [time, groups, size]. ",
+            "Use biomass[t, g, ] to access all sizes. See ?getBiomass for examples.")
+    options(zoomss.biomass.msg.shown = TRUE)
   }
 
   return(Biomass)

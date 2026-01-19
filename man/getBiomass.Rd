@@ -12,7 +12,7 @@ getBiomass(mdl, units = "ww")
 \item{units}{Character string specifying biomass units: "ww" for wet weight (default) or "carbon" for carbon biomass}
 }
 \value{
-3D array of biomass values with same dimensions as N. Units depend on the units parameter:
+3D array of biomass values with dimensions \link{time, groups, size}. Units depend on the units parameter:
 \itemize{
 \item "ww": grams wet weight
 \item "carbon": grams carbon
@@ -29,14 +29,31 @@ This function transforms abundance matrices to biomass by applying the
 weight vector across size classes. Essential for analyses requiring biomass
 units rather than abundance counts. Works with 3D arrays (time, groups, size_classes).
 Can convert to either wet weight or carbon biomass units.
+
+\strong{Important:} The returned biomass array is always 3D with dimensions \link{time, groups, size}.
+When subsetting, remember to include all three dimensions:
+\itemize{
+\item Correct: \code{biomass[t, g, ]} to get all sizes for time t and group g
+\item Incorrect: \code{biomass[t, g]} will cause "incorrect number of dimensions" error
+}
+
+To get total biomass for specific groups:
+\itemize{
+\item Single time point: \code{sum(biomass[t, groups, ])}
+\item All time points: \code{apply(biomass[, groups, ], 1, sum)}
+}
 }
 \examples{
 \dontrun{
 # Run ZooMSS model
 results <- zoomss_model(input_params, Groups)
 
-# Convert abundances to wet weight biomass
+# Convert abundances to wet weight biomass (returns 3D array)
 biomass_ww <- getBiomass(results, units = "ww")
+
+# Get total fish biomass at final time step (groups 10-12)
+final_time <- dim(biomass_ww)[1]
+total_fish <- sum(biomass_ww[final_time, 10:12, ])  # Note the third comma!
 
 # Convert abundances to carbon biomass
 biomass_carbon <- getBiomass(results, units = "carbon")
