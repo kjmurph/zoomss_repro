@@ -1,0 +1,673 @@
+---
+title: "Fish Reproduction and Energy Budget in ZooMSS"
+vignette: >
+  %\VignetteIndexEntry{Fish Reproduction and Energy Budget}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+options(rmarkdown.html_vignette.check_title = FALSE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(zoomss)
+library(ggplot2)
+library(patchwork)
+```
+
+## Introduction
+
+This vignette demonstrates the explicit energy budget and fish reproduction system in ZooMSS. The model now implements a DBPM-style (Dynamic Benthic-Pelagic Model) energy budget that explicitly tracks:
+- **Defecation**: Energy lost as faeces (varies with prey quality)
+- **Assimilation**: Energy absorbed through the gut wall
+- **Metabolism**: Energy spent on maintenance (f_M fraction)
+- **Growth**: Energy allocated to somatic growth (K_growth fraction)
+- **Reproduction**: Energy allocated to reproductive output (R_frac fraction)
+
+For fish groups with `repro_on = 1`, reproductive investment drives population dynamics through explicit recruitment.
+
+## The Energy Budget Structure
+
+The energy budget follows a two-stage partitioning:
+
+**Stage 1: Ingestion Partitioning**
+$$
+\text{Ingestion} = \text{Defecation} + \text{Assimilation}
+$$
+
+Where defecation varies continuously based on prey Carbon content:
+$$
+D_{prey} = D_{high} + (D_{low} - D_{high}) \times \left(1 - \frac{C_{prey}}{C_{max}}\right)
+$$
+
+This formulation interpolates between low defecation for high-quality (high Carbon) prey and high defecation for low-quality (low Carbon) prey. The approach is based on the Dynamic Benthic-Pelagic Model (DBPM; Blanchard et al. 2009, 2012) which uses two food quality categories (D=0.30 for high quality, D=0.50 for low quality). We extend this to a continuous function using Carbon:wet weight ratio as a proxy for food qualitys.
+
+**Stage 2: Assimilation Partitioning**
+$$
+\text{Assimilated} = \text{Metabolism} + \text{Growth} + \text{Reproduction}
+$$
+
+Where: $f_M + K + R_{frac} = 1$
+
+## Model Setup
+
+Let's load the default groups and examine the energy budget parameters:
+
+```{r}
+Groups <- getGroups()
+
+# Display energy budget parameters
+energy_params <- Groups[, c("Species", "Type", "def_high", "def_low", 
+                            "f_M", "K_growth", "repro_on", "Carbon")]
+print(energy_params)
+```
+
+Notice that:
+- **Zooplankton** have `K_growth = 0.50` and `repro_on = 0` (all production goes to growth)
+- **Fish** have `K_growth = 0.36` and `repro_on = 1` (reproduction is enabled)
+- `R_frac = 1 - f_M - K_growth = 1 - 0.50 - 0.36 = 0.14` for fish
+
+## Part 1: Constant Environmental Conditions
+
+First, let's run the model with constant temperature and chlorophyll (1 mg m⁻³) to establish baseline reproduction dynamics. We run for 200 years to ensure the model reaches an oscillating steady-state.
+
+```{r}
+# Create constant environmental conditions
+env_constant <- createInputParams(
+  time = seq(0, 200, by = 0.1),
+  sst = 15,
+  chl = 1.0  # 1 mg/m³ chlorophyll
+)
+
+# Plot the environmental forcing
+plotEnvironment(env_constant)
+```
+
+```{r}
+# Run the model with constant environment
+mdl_constant <- zoomss_model(
+  input_params = env_constant, 
+  Groups = Groups, 
+  isave = 2
+)
+```
+
+### Visualizing the Energy Budget
+
+Before examining the model dynamics, let's visualize the energy budget structure.
+
+#### Energy Budget Allocation
+
+This plot shows how assimilated energy is partitioned into metabolism, growth, and reproduction for each functional group:
+
+```{r fig.height=5}
+plotEnergyBudget(mdl_constant)
+```
+
+Note that zooplankton allocate all production energy to growth (K = 0.50), while fish split production between growth (K = 0.36) and reproduction (R_frac = 0.14).
+
+#### Defecation by Prey Quality
+
+This plot shows how defecation rate varies with prey Carbon content:
+
+```{r fig.height=5}
+plotDefecation(mdl_constant)
+```
+
+The defecation fraction decreases linearly with increasing prey Carbon content. High-Carbon prey (like ciliates at 0.15 g C/g WW) have low defecation (~30%), while low-Carbon prey (like jellyfish at 0.005 g C/g WW) have high defecation (~50%).
+
+#### Prey-Specific Growth Efficiency Matrix
+
+This heatmap shows the net growth efficiency for each predator-prey combination:
+
+```{r fig.height=6}
+plotAssimilationMatrix(mdl_constant)
+```
+
+This matrix displays the growth efficiency for each predator-prey combination, calculated as $(1 - D_{prey}) \times K_{predator}$. Prey are ordered by Carbon content along the x-axis (low Carbon like Larvaceans and Salps on the left, high Carbon like Ciliates on the right). Higher values (brighter colours) indicate that a predator gains more somatic growth per unit prey consumed. Zooplankton (K=0.50) have higher growth efficiency than fish (K=0.36) because fish divert some assimilated energy to reproduction.
+
+### Biomass Dynamics
+
+Let's examine the biomass dynamics over time:
+
+```{r fig.height=9}
+# Plot biomass time series for all groups
+p1 <- plotTimeSeries(mdl_constant, by = "biomass", transform = "log10") +
+  ggtitle("All Groups - Biomass Time Series")
+
+# Focus on fish groups only
+p2 <- plotTimeSeries(mdl_constant, by = "biomass", 
+                     species = c("Fish_Small", "Fish_Med", "Fish_Large"),
+                     transform = "log10") +
+  ggtitle("Fish Groups - Biomass Time Series")
+
+# Stacked biomass showing proportions
+p3 <- plotTimeSeries(mdl_constant, by = "biomass", type = "fill") +
+  ggtitle("Relative Biomass Proportions")
+
+wrap_plots(p1, p2, p3, ncol = 1)
+```
+
+### Reproduction Metrics
+
+Now let's examine the reproduction metrics for fish:
+
+```{r fig.height=9}
+# Spawning Stock Biomass (SSB)
+p_ssb <- plotReproduction(mdl_constant, by = "SSB") +
+  ggtitle("Spawning Stock Biomass (SSB)")
+
+# Recruitment
+p_recruit <- plotReproduction(mdl_constant, by = "recruitment") +
+  ggtitle("Recruitment")
+
+# Total reproductive output
+p_repro <- plotReproduction(mdl_constant, by = "repro_output") +
+  ggtitle("Total Reproductive Output")
+
+wrap_plots(p_ssb, p_recruit, p_repro, ncol = 1)
+```
+
+### Growth Rate Comparison
+
+Compare growth rates between fish and zooplankton:
+
+```{r fig.height=6}
+# Growth rates for zooplankton (higher K_growth = 0.50)
+p_zoo <- plotGrowthComparison(mdl_constant, groups = "zooplankton") +
+  ggtitle("Zooplankton Growth Rates")
+
+# Growth rates for fish (lower K_growth = 0.36, with reproduction)
+p_fish <- plotGrowthComparison(mdl_constant, groups = "fish") +
+  ggtitle("Fish Growth Rates")
+
+wrap_plots(p_zoo, p_fish, ncol = 1, guides = "collect")
+```
+
+### Reproductive Investment by Size
+
+Examine how reproductive investment varies with body size:
+
+```{r}
+plotReproSizeSpectra(mdl_constant, n_years = 10) +
+  ggtitle("Fish Reproductive Rate by Body Size")
+```
+
+The reproductive rate increases with body size within each fish group, reflecting:
+1. The maturity ogive (larger individuals are more likely to be mature)
+2. The body-size scaling of growth rates
+
+### Size Spectra
+
+```{r fig.height=6}
+# Abundance size spectrum
+p_abund <- plotSizeSpectra(mdl_constant, by = "abundance", n_years = 10) +
+  ggtitle("Abundance Size Spectrum")
+
+# Biomass size spectrum  
+p_biom <- plotSizeSpectra(mdl_constant, by = "biomass", n_years = 10) +
+  ggtitle("Biomass Size Spectrum")
+
+wrap_plots(p_abund, p_biom, ncol = 1, guides = "collect")
+```
+
+## Part 2: Seasonal Environmental Forcing
+
+Now let's compare with seasonal environmental conditions to see how reproduction responds to environmental variability. We use the same base chlorophyll (1 mg m⁻³) but with seasonal variation.
+
+```{r}
+# Create seasonal environmental conditions using createEnviroData
+env_seasonal <- createEnviroData(
+  n_years = 100,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 1.0,  # Same base as constant run
+  seasonal = TRUE,
+  sst_amplitude = 4,  # ±4°C seasonal variation
+  chl_amplitude = 0.5  # ±0.5 mg/m³ seasonal variation
+)
+
+# Convert to input params format
+env_seasonal_params <- createInputParams(
+  time = env_seasonal$time,
+  sst = env_seasonal$sst,
+  chl = env_seasonal$chl
+)
+
+# Plot the seasonal environment
+plotEnvironment(env_seasonal_params)
+```
+
+```{r}
+# Run the model with seasonal environment
+mdl_seasonal <- zoomss_model(
+  input_params = env_seasonal_params, 
+  Groups = Groups, 
+  isave = 2
+)
+```
+
+### Comparing Constant vs Seasonal: Biomass
+
+```{r fig.height=9}
+# Constant environment biomass
+p_const <- plotTimeSeries(mdl_constant, by = "biomass", 
+                          species = c("Fish_Small", "Fish_Med", "Fish_Large"),
+                          transform = "log10") +
+  ggtitle("Constant Environment - Fish Biomass") +
+  xlim(50, 100)
+
+# Seasonal environment biomass
+p_seas <- plotTimeSeries(mdl_seasonal, by = "biomass", 
+                         species = c("Fish_Small", "Fish_Med", "Fish_Large"),
+                         transform = "log10") +
+  ggtitle("Seasonal Environment - Fish Biomass") +
+  xlim(50, 100)
+
+# Show the seasonal forcing for context
+p_env <- plotEnvironment(env_seasonal_params) & xlim(50, 100)
+
+wrap_plots(p_const, p_seas, p_env, ncol = 1, heights = c(1, 1, 1))
+```
+
+### Comparing Constant vs Seasonal: Reproduction
+
+```{r fig.height=9}
+# SSB comparison
+p_ssb_const <- plotReproduction(mdl_constant, by = "SSB") +
+  ggtitle("Constant - SSB") +
+  xlim(50, 100)
+
+p_ssb_seas <- plotReproduction(mdl_seasonal, by = "SSB") +
+  ggtitle("Seasonal - SSB") +
+  xlim(50, 100)
+
+# Recruitment comparison  
+p_rec_const <- plotReproduction(mdl_constant, by = "recruitment") +
+  ggtitle("Constant - Recruitment") +
+  xlim(50, 100)
+
+p_rec_seas <- plotReproduction(mdl_seasonal, by = "recruitment") +
+  ggtitle("Seasonal - Recruitment") +
+  xlim(50, 100)
+
+wrap_plots(p_ssb_const, p_ssb_seas, p_rec_const, p_rec_seas, 
+           ncol = 2, guides = "collect")
+```
+
+## Part 3: Exploring Chlorophyll Gradients
+
+Let's explore how productivity (chlorophyll concentration) affects reproduction metrics and community composition across a wide gradient from oligotrophic (0.1 mg m⁻³) to eutrophic (10 mg m⁻³) conditions. We run each scenario for 100 years to ensure steady-state.
+
+```{r}
+# Run models across an extended chlorophyll gradient (0.1 to 10 mg/m³)
+chl_levels <- c(0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
+results_chl <- list()
+
+for (i in seq_along(chl_levels)) {
+  env_chl <- createInputParams(
+    time = seq(0, 100, by = 0.1),
+    sst = 15,
+    chl = chl_levels[i]
+  )
+  
+  results_chl[[i]] <- zoomss_model(
+    input_params = env_chl,
+    Groups = Groups,
+    isave = 2
+  )
+}
+```
+
+### Fish Biomass, SSB and Recruitment Across the Gradient
+
+```{r fig.height=10}
+# Extract final biomass, SSB and recruitment values for each chlorophyll level
+num_fish <- 3
+fish_names <- c("Fish_Small", "Fish_Med", "Fish_Large")
+fish_grps <- results_chl[[1]]$param$fish_grps
+
+fish_summary <- data.frame(
+  chl = rep(chl_levels, each = num_fish),
+  fish_group = rep(fish_names, length(chl_levels)),
+  final_biomass = NA,
+  final_SSB = NA,
+  final_recruitment = NA
+)
+
+for (i in seq_along(chl_levels)) {
+  mdl <- results_chl[[i]]
+  final_idx <- length(mdl$time)
+  
+  # Get average biomass over last 10 years
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 10)
+  fish_biomass <- rowSums(avg_biomass[fish_grps, , drop = FALSE])
+  
+  for (f in 1:num_fish) {
+    row_idx <- (i - 1) * num_fish + f
+    fish_summary$final_biomass[row_idx] <- fish_biomass[f]
+    fish_summary$final_SSB[row_idx] <- mdl$SSB[final_idx, f]
+    fish_summary$final_recruitment[row_idx] <- mdl$recruitment[final_idx, f]
+  }
+}
+
+# Get fish colours
+fish_colours <- results_chl[[1]]$param$Groups$PlotColour[fish_grps]
+names(fish_colours) <- fish_names
+
+# Plot Fish Biomass vs chlorophyll
+p_biomass <- ggplot(fish_summary, aes(x = chl, y = final_biomass, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = "Biomass",
+       title = "Fish Biomass Response to Productivity Gradient",
+       colour = "Fish Group")
+
+# Plot SSB vs chlorophyll
+p_ssb <- ggplot(fish_summary, aes(x = chl, y = final_SSB, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = "Spawning Stock Biomass (SSB)",
+       title = "Fish SSB Response to Productivity Gradient",
+       colour = "Fish Group")
+
+# Plot Recruitment vs chlorophyll
+p_recruit <- ggplot(fish_summary, aes(x = chl, y = final_recruitment, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = "Recruitment",
+       title = "Fish Recruitment Response to Productivity Gradient",
+       colour = "Fish Group")
+
+wrap_plots(p_biomass, p_ssb, p_recruit, ncol = 1, guides = "collect")
+```
+
+### Community Composition Across the Gradient
+
+Let's examine how the relative proportions of zooplankton and fish change across the productivity gradient.
+
+```{r fig.height=10}
+# Extract biomass for all groups at steady state (average last 10 years)
+all_species <- results_chl[[1]]$param$Groups$Species
+ngrps <- length(all_species)
+
+biomass_summary <- data.frame(
+  chl = rep(chl_levels, each = ngrps),
+  species = rep(all_species, length(chl_levels)),
+  biomass = NA,
+  type = rep(results_chl[[1]]$param$Groups$Type, length(chl_levels))
+)
+
+for (i in seq_along(chl_levels)) {
+  mdl <- results_chl[[i]]
+  # Average biomass over last 10 years
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 10)
+  total_biomass <- rowSums(avg_biomass)
+  
+  for (g in 1:ngrps) {
+    row_idx <- (i - 1) * ngrps + g
+    biomass_summary$biomass[row_idx] <- total_biomass[g]
+  }
+}
+
+# Calculate proportions within each chl level
+biomass_summary <- biomass_summary %>%
+  dplyr::group_by(chl) %>%
+  dplyr::mutate(proportion = biomass / sum(biomass, na.rm = TRUE)) %>%
+  dplyr::ungroup()
+
+# Set species factor levels for plotting
+biomass_summary$species <- factor(biomass_summary$species, levels = all_species)
+
+# Get colours from the model
+plot_colours <- results_chl[[1]]$param$Groups$PlotColour
+names(plot_colours) <- all_species
+
+# Create stacked proportion plot
+p_prop <- ggplot(biomass_summary, aes(x = factor(chl), y = proportion, fill = species)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = plot_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = "Proportion of Total Biomass",
+       title = "Community Composition Across Productivity Gradient",
+       fill = "Species") +
+  theme(legend.position = "right")
+
+# Also show absolute biomass
+p_abs <- ggplot(biomass_summary, aes(x = chl, y = biomass, colour = species)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(values = plot_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = "Biomass",
+       title = "Absolute Biomass Across Productivity Gradient",
+       colour = "Species")
+
+wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
+```
+
+## Part 4: Temperature Effects
+
+Explore how temperature affects fish reproduction through metabolic scaling. We run 100-year simulations at 1 mg m⁻³ chlorophyll across a temperature gradient.
+
+```{r}
+# Run models across a temperature gradient
+sst_levels <- c(5, 10, 15, 20, 25)
+results_sst <- list()
+
+for (i in seq_along(sst_levels)) {
+  env_sst <- createInputParams(
+    time = seq(0, 100, by = 0.1),
+    sst = sst_levels[i],
+    chl = 1.0
+  )
+  
+  results_sst[[i]] <- zoomss_model(
+    input_params = env_sst,
+    Groups = Groups,
+    isave = 2
+  )
+}
+```
+
+### Fish Biomass, SSB and Recruitment Across the Temperature Gradient
+
+```{r fig.height=10}
+# Extract final biomass, SSB and recruitment values for each temperature level
+num_fish <- 3
+fish_names <- c("Fish_Small", "Fish_Med", "Fish_Large")
+fish_grps <- results_sst[[1]]$param$fish_grps
+
+fish_sst_summary <- data.frame(
+  sst = rep(sst_levels, each = num_fish),
+  fish_group = rep(fish_names, length(sst_levels)),
+  final_biomass = NA,
+  final_SSB = NA,
+  final_recruitment = NA
+)
+
+for (i in seq_along(sst_levels)) {
+  mdl <- results_sst[[i]]
+  final_idx <- length(mdl$time)
+  
+  # Get average biomass over last 10 years
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 10)
+  fish_biomass <- rowSums(avg_biomass[fish_grps, , drop = FALSE])
+  
+  for (f in 1:num_fish) {
+    row_idx <- (i - 1) * num_fish + f
+    fish_sst_summary$final_biomass[row_idx] <- fish_biomass[f]
+    fish_sst_summary$final_SSB[row_idx] <- mdl$SSB[final_idx, f]
+    fish_sst_summary$final_recruitment[row_idx] <- mdl$recruitment[final_idx, f]
+  }
+}
+
+# Get fish colours
+fish_colours <- results_sst[[1]]$param$Groups$PlotColour[fish_grps]
+names(fish_colours) <- fish_names
+
+# Plot Fish Biomass vs temperature
+p_biomass <- ggplot(fish_sst_summary, aes(x = sst, y = final_biomass, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = "Sea Surface Temperature (°C)",
+       y = "Biomass",
+       title = "Fish Biomass Response to Temperature",
+       colour = "Fish Group")
+
+# Plot SSB vs temperature
+p_ssb <- ggplot(fish_sst_summary, aes(x = sst, y = final_SSB, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = "Sea Surface Temperature (°C)",
+       y = "Spawning Stock Biomass (SSB)",
+       title = "Fish SSB Response to Temperature",
+       colour = "Fish Group")
+
+# Plot Recruitment vs temperature
+p_recruit <- ggplot(fish_sst_summary, aes(x = sst, y = final_recruitment, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_y_log10() +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = "Sea Surface Temperature (°C)",
+       y = "Recruitment",
+       title = "Fish Recruitment Response to Temperature",
+       colour = "Fish Group")
+
+wrap_plots(p_biomass, p_ssb, p_recruit, ncol = 1, guides = "collect")
+```
+
+### Community Composition Across the Temperature Gradient
+
+```{r fig.height=10}
+# Extract biomass for all groups at steady state (average last 10 years)
+all_species <- results_sst[[1]]$param$Groups$Species
+ngrps <- length(all_species)
+
+biomass_sst_summary <- data.frame(
+  sst = rep(sst_levels, each = ngrps),
+  species = rep(all_species, length(sst_levels)),
+  biomass = NA,
+  type = rep(results_sst[[1]]$param$Groups$Type, length(sst_levels))
+)
+
+for (i in seq_along(sst_levels)) {
+  mdl <- results_sst[[i]]
+  # Average biomass over last 10 years
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 10)
+  total_biomass <- rowSums(avg_biomass)
+  
+  for (g in 1:ngrps) {
+    row_idx <- (i - 1) * ngrps + g
+    biomass_sst_summary$biomass[row_idx] <- total_biomass[g]
+  }
+}
+
+# Calculate proportions within each sst level
+biomass_sst_summary <- biomass_sst_summary %>%
+  dplyr::group_by(sst) %>%
+  dplyr::mutate(proportion = biomass / sum(biomass, na.rm = TRUE)) %>%
+  dplyr::ungroup()
+
+# Set species factor levels for plotting
+biomass_sst_summary$species <- factor(biomass_sst_summary$species, levels = all_species)
+
+# Get colours from the model
+plot_colours <- results_sst[[1]]$param$Groups$PlotColour
+names(plot_colours) <- all_species
+
+# Create stacked proportion plot
+p_prop <- ggplot(biomass_sst_summary, aes(x = factor(sst), y = proportion, fill = species)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = plot_colours) +
+  theme_bw() +
+  labs(x = "Sea Surface Temperature (°C)",
+       y = "Proportion of Total Biomass",
+       title = "Community Composition Across Temperature Gradient",
+       fill = "Species") +
+  theme(legend.position = "right")
+
+# Also show absolute biomass
+p_abs <- ggplot(biomass_sst_summary, aes(x = sst, y = biomass, colour = species)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_y_log10() +
+  scale_colour_manual(values = plot_colours) +
+  theme_bw() +
+  labs(x = "Sea Surface Temperature (°C)",
+       y = "Biomass",
+       title = "Absolute Biomass Across Temperature Gradient",
+       colour = "Species")
+
+wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
+```
+
+## Summary
+
+This vignette demonstrated the explicit energy budget and fish reproduction system in ZooMSS:
+
+1. **Energy Budget Components**: The model now explicitly tracks defecation, metabolism, growth, and reproduction fractions
+
+2. **Prey Quality Effects**: Defecation varies continuously with prey Carbon content - high-Carbon prey (like ciliates) have low defecation (~30%) while low-Carbon prey (like jellyfish) have high defecation (~50%)
+
+3. **Fish Reproduction**: Fish groups allocate a fraction of assimilated energy (R_frac = 0.14) to reproduction, scaled by a maturity ogive
+
+4. **Recruitment**: New fish enter the population through explicit recruitment based on Spawning Stock Biomass (SSB)
+
+5. **Environmental Sensitivity**: Reproduction metrics respond to:
+   - Productivity (chlorophyll concentration)
+   - Temperature (through metabolic scaling)
+   - Seasonal cycles in environmental conditions
+
+### Key Differences from Zooplankton
+
+| Aspect | Zooplankton | Fish |
+|--------|-------------|------|
+| K_growth | 0.50 | 0.36 |
+| R_frac | 0.00 | 0.14 |
+| repro_on | 0 (disabled) | 1 (enabled) |
+| Recruitment | Boundary condition | SSB-driven |
+
+The explicit energy budget provides a mechanistic foundation for understanding how environmental change affects fish population dynamics through reproduction.
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

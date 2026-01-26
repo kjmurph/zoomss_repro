@@ -82,7 +82,6 @@ zoomss_params <- function(Groups, input_params, isave){
     dt = dt_calc, # timestep - calculated from time
     w0 = 10^(min(Groups$W0)),		# minimum size class
     wMax = 10^(max(Groups$Wmax)),# maximum size class
-    gge_base = 0.25, # baseline gross growth efficiency
     ZSpre = 1, # senescence mortality prefactor
     ZSexp = 0.3, # senescence mortality exponent
     w0_phyto = 10^(-14.5), # minimum phytoplankton size class (1um)
@@ -92,6 +91,7 @@ zoomss_params <- function(Groups, input_params, isave){
     num_zoo = sum(Groups$Type == "Zooplankton"), # How many zooplankton
     num_fish = sum(Groups$Type == "Fish"), # How many fish
     cc_phyto = 0.1, # Carbon content of phytoplankton size classes
+    Carbon_max = max(Groups$Carbon), # Maximum Carbon content across all groups (for defecation scaling)
     isave = isave # how often to save results every 'isave' time steps
   )
 
@@ -159,6 +159,46 @@ zoomss_params <- function(Groups, input_params, isave){
   param2$w_phyto <- 10^(seq(from = log10(param$w0_phyto), to = log10(param2$wMax_phyto), param$dx)) # Set up phytoplankton size classes
   param2$ngrid <- length(param2$w) # total number of size classes for zoo and fish
   param2$ngridPP <- length(param2$w_phyto) # total number of size classes for phyto
+
+  # =============================================================================
+  # ENERGY BUDGET DERIVED PARAMETERS
+  # =============================================================================
+
+  # Derived reproduction fraction (R_frac = 1 - f_M - K_growth)
+  param2$R_frac <- 1 - Groups$f_M - Groups$K_growth
+
+  # Phytoplankton defecation - continuous scaling based on cc_phyto Carbon content
+  # def = def_high + (def_low - def_high) * (1 - Carbon / Carbon_max)
+  # Use mean def_high/def_low across groups for phyto (they should be same for all)
+  param2$def_phyto <- mean(Groups$def_high) +
+    (mean(Groups$def_low) - mean(Groups$def_high)) * (1 - param$cc_phyto / param$Carbon_max)
+
+  # Maturation size indices for each group (index of Wmat in w_log10 grid)
+  param2$mat_size_idx <- sapply(1:param$ngrps, function(g) {
+    which.min(abs(param2$w_log10 - Groups$Wmat[g]))
+  })
+
+  # Minimum size class index for each group (for recruitment boundary)
+  param2$min_size_idx <- sapply(1:param$ngrps, function(g) {
+    which(param2$w_log10 == Groups$W0[g])
+  })
+
+  # Maximum size class index for each group
+  param2$max_size_idx <- sapply(1:param$ngrps, function(g) {
+    which(param2$w_log10 == Groups$Wmax[g])
+  })
+
+  # Create maturity ogive matrix (ngrps x ngrid)
+  # mat_ogive = 1 / (1 + exp(-slope * (log10_w - Wmat)))
+  # Gives smooth transition from 0 (fully immature) to 1 (fully mature) around Wmat
+  param2$mat_ogive <- matrix(0, nrow = param$ngrps, ncol = param2$ngrid)
+  for (g in 1:param$ngrps) {
+    param2$mat_ogive[g, ] <- 1 / (1 + exp(-Groups$mat_ogive_slope[g] *
+                                            (param2$w_log10 - Groups$Wmat[g])))
+    # Zero out outside group's size range
+    param2$mat_ogive[g, param2$w_log10 < Groups$W0[g]] <- 0
+    param2$mat_ogive[g, param2$w_log10 > Groups$Wmax[g]] <- 0
+  }
 
   # Final parameter combination
   # Exclude time series vectors from input_params since they're now stored as _ts arrays in param2

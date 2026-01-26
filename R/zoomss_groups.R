@@ -174,11 +174,12 @@ validateGroups <- function(groups) {
   assertthat::assert_that(is.data.frame(groups),
                          msg = "Groups must be a data frame")
 
-  # Check required columns exist (based on actual GroupInputs.csv structure)
+  # Check required columns exist (based on new energy budget structure)
   required_cols <- c("Species", "Type", "FeedType", "Prop", "W0", "Wmax", "Wmat",
                      "SearchCoef", "SearchExp", "PPMRscale", "PPMR", "FeedWidth",
-                     "GrossGEscale", "Carbon", "Repro", "Fmort", "Fmort_W0",
-                     "Fmort_Wmax", "PlotColour")
+                     "Carbon", "def_high", "def_low", "f_M", "K_growth",
+                     "repro_eff", "repro_on", "mat_ogive_slope",
+                     "Fmort", "Fmort_W0", "Fmort_Wmax", "PlotColour")
 
   missing_cols <- setdiff(required_cols, names(groups))
   assertthat::assert_that(length(missing_cols) == 0,
@@ -235,11 +236,44 @@ validateGroups <- function(groups) {
   assertthat::assert_that(all(groups$FeedWidth > 0),
                          msg = "FeedWidth must be positive")
 
-  assertthat::assert_that(all(groups$GrossGEscale > 0),
-                         msg = "GrossGEscale must be positive")
-
   assertthat::assert_that(all(groups$Carbon > 0 & groups$Carbon <= 1),
                          msg = "Carbon content must be between 0 and 1")
+
+  # Check energy budget parameters
+  assertthat::assert_that(all(groups$def_high >= 0 & groups$def_high < 1),
+                         msg = "def_high must be between 0 and 1")
+
+  assertthat::assert_that(all(groups$def_low >= 0 & groups$def_low < 1),
+                         msg = "def_low must be between 0 and 1")
+
+  assertthat::assert_that(all(groups$def_low >= groups$def_high),
+                         msg = "def_low must be >= def_high (low quality food = more defecation)")
+
+  assertthat::assert_that(all(groups$f_M >= 0 & groups$f_M < 1),
+                         msg = "f_M (metabolic fraction) must be between 0 and 1")
+
+  assertthat::assert_that(all(groups$K_growth > 0 & groups$K_growth <= 1),
+                         msg = "K_growth must be between 0 and 1")
+
+  # Check energy budget constraint: f_M + K_growth <= 1 (remainder is reproduction)
+  R_frac <- 1 - groups$f_M - groups$K_growth
+  assertthat::assert_that(all(R_frac >= 0),
+                         msg = "f_M + K_growth must be <= 1 (R_frac = 1 - f_M - K_growth must be >= 0)")
+
+  # Check reproduction parameters
+  assertthat::assert_that(all(groups$repro_eff >= 0 & groups$repro_eff <= 1),
+                         msg = "repro_eff must be between 0 and 1")
+
+  assertthat::assert_that(all(groups$repro_on %in% c(0, 1)),
+                         msg = "repro_on must be 0 or 1")
+
+  # Check that repro_on is only enabled for fish (zooplankton must have repro_on = 0)
+  zoo_mask <- groups$Type == "Zooplankton"
+  assertthat::assert_that(all(groups$repro_on[zoo_mask] == 0),
+                         msg = "repro_on must be 0 for zooplankton groups (reproduction only implemented for fish)")
+
+  assertthat::assert_that(all(groups$mat_ogive_slope > 0),
+                         msg = "mat_ogive_slope must be positive")
 
   # Check fishing mortality is non-negative
   assertthat::assert_that(all(groups$Fmort >= 0),

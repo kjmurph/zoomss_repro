@@ -32,9 +32,14 @@ non_default_groups <- data.frame(
     PPMRscale = c(1.0, 1.0),
     PPMR = c(NA, 1000),
     FeedWidth = c(2.0, 3.0),
-    GrossGEscale = c(2.5, 2.5),
+    def_high = c(0.30, 0.30),
+    def_low = c(0.50, 0.50),
+    f_M = c(0.50, 0.50),
+    K_growth = c(0.50, 0.36),
+    repro_eff = c(0.001, 0.001),
+    repro_on = c(0, 1),
+    mat_ogive_slope = c(10, 10),
     Carbon = c(0.1, 0.1),
-    Repro = c(0.0, 0.0),
     Fmort = c(0.0, 0.1),
     Fmort_W0 = c(-8.0, 0.0),  # Use exact values that match w_log10 grid
     Fmort_Wmax = c(-6.0, 3.0),  # Use exact values that match w_log10 grid
@@ -179,7 +184,7 @@ test_that("zoomss_setup creates model structure", {
   expect_equal(length(dim(model$N)), 3)  # time x groups x size_classes
 })
 
-test_that("zoomss_setup initializes mortality and efficiency matrices", {
+test_that("zoomss_setup initializes mortality and energy budget matrices", {
 
   params <- zoomss_params(Groups, env_data, isave = 5)
   model <- zoomss_setup(params)
@@ -190,14 +195,28 @@ test_that("zoomss_setup initializes mortality and efficiency matrices", {
   expect_true(is.matrix(model$M_sb_base))
   expect_true(is.matrix(model$fish_mort))
 
-  # Check efficiency matrix
-  expect_true("assim_eff" %in% names(model))
-  expect_true(is.matrix(model$assim_eff))
+  # Check energy budget components (replacing old assim_eff)
+  expect_true("assim_by_prey" %in% names(model))
+  expect_true("K_growth" %in% names(model))
+  expect_true("R_frac" %in% names(model))
+  expect_true("mat_ogive" %in% names(model))
+  expect_true("repro_on" %in% names(model))
+  expect_true("repro_eff" %in% names(model))
+
+  expect_true(is.matrix(model$assim_by_prey))
+  expect_true(is.matrix(model$mat_ogive))
 
   # Check dimensions match groups and size classes
   expect_equal(nrow(model$M_sb_base), params$ngrps)
   expect_equal(nrow(model$fish_mort), params$ngrps)
-  expect_equal(nrow(model$assim_eff), params$ngrps)
+  expect_equal(nrow(model$assim_by_prey), params$ngrps)
+  expect_equal(ncol(model$assim_by_prey), params$ngrps)  # prey-specific matrix
+
+  # Check reproduction output arrays
+  expect_true("repro_rate" %in% names(model))
+  expect_true("SSB" %in% names(model))
+  expect_true("recruitment" %in% names(model))
+  expect_true("total_repro_output" %in% names(model))
 })
 
 # Tests for zoomss_run() -------------------------------------------------
@@ -285,6 +304,59 @@ test_that("Model handles edge cases gracefully", {
   expect_no_error({
     result_sparse <- zoomss_model(env_data, Groups, isave = 50)
   })
+})
+
+# Energy budget tests ----------------------------------------------------
+
+test_that("Energy budget constraint validation works", {
+
+  # Create groups that violate energy budget constraint (f_M + K_growth > 1)
+  bad_energy_groups <- non_default_groups
+  bad_energy_groups$f_M <- c(0.7, 0.7)
+  bad_energy_groups$K_growth <- c(0.5, 0.5)  # f_M + K_growth = 1.2 > 1
+
+  expect_error(
+    validateGroups(bad_energy_groups),
+    "f_M \\+ K_growth must be <= 1"
+  )
+})
+
+test_that("Zooplankton reproduction validation works", {
+
+  # Create groups where zooplankton has repro_on = 1 (should fail)
+  bad_repro_groups <- non_default_groups
+  bad_repro_groups$repro_on <- c(1, 1)  # Zoo should not have repro_on = 1
+
+  expect_error(
+    validateGroups(bad_repro_groups),
+    "repro_on must be 0 for zooplankton groups"
+  )
+})
+
+test_that("Model produces reproduction outputs", {
+
+  result <- zoomss_model(env_data, non_default_groups, isave = 5)
+
+  # Check reproduction outputs exist
+  expect_true("repro_rate" %in% names(result))
+  expect_true("SSB" %in% names(result))
+  expect_true("recruitment" %in% names(result))
+  expect_true("total_repro_output" %in% names(result))
+
+  # Check dimensions
+  expect_true(is.array(result$repro_rate))
+  expect_true(is.matrix(result$SSB))
+  expect_true(is.matrix(result$recruitment))
+
+  # SSB and recruitment should be time x num_fish
+  num_fish <- sum(non_default_groups$Type == "Fish")
+  expect_equal(ncol(result$SSB), num_fish)
+  expect_equal(ncol(result$recruitment), num_fish)
+
+  # Check that fish with repro_on=1 have non-zero reproduction
+  # (at least in some time steps after model stabilizes)
+  # SSB should be positive for fish groups
+  expect_true(any(result$SSB > 0))
 })
 
 

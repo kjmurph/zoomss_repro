@@ -88,8 +88,31 @@ zoomss_setup <- function(param){
     M_sb_base = matrix(0, nrow = param$ngrps, ncol = param$ngrid), # base senescence mortality (before temp effect)
     fish_mort = matrix(0, nrow = param$ngrps, ncol = param$ngrid), # fishing mortality
 
-    # Assimilation efficiency (constant)
-    assim_eff = matrix(param$Groups$GrossGEscale * param$Groups$Carbon, nrow = param$ngrps, ncol = length(param$w)),
+    # ==========================================================================
+    # ENERGY BUDGET PARAMETERS (replacing assim_eff)
+    # ==========================================================================
+
+    # Energy budget fractions (group-specific, constant across sizes)
+    # def_high and def_low are used for continuous defecation scaling based on prey Carbon
+    def_high = param$Groups$def_high,  # Defecation for high-C prey (vector, ngrps)
+    def_low = param$Groups$def_low,    # Defecation for low-C prey (vector, ngrps)
+    f_M = param$Groups$f_M,            # Metabolic fraction of assimilated (vector, ngrps)
+    K_growth = param$Groups$K_growth,  # Growth fraction of assimilated (vector, ngrps)
+    R_frac = param$R_frac,             # Reproduction fraction of assimilated (derived, vector, ngrps)
+
+    # Prey Carbon content for defecation scaling (prey-specific)
+    prey_Carbon = param$Groups$Carbon, # Carbon content of each group as prey (vector, ngrps)
+    Carbon_max = param$Carbon_max,     # Maximum Carbon across groups (for scaling)
+    def_phyto = param$def_phyto,       # Defecation for phytoplankton (scalar)
+
+    # Maturity ogive for reproduction (group x size)
+    mat_ogive = param$mat_ogive,       # Maturity fraction at each size (matrix, ngrps x ngrid)
+
+    # Reproduction parameters
+    repro_eff = param$Groups$repro_eff,  # Reproductive efficiency (vector, ngrps)
+    repro_on = param$Groups$repro_on,    # Reproduction enabled flag (vector, ngrps)
+
+    # ==========================================================================
 
     # Temperature effects matrix - initialize with first timestep values
     temp_eff = matrix(1, nrow = param$ngrps, ncol = param$ngrid), # Will be updated dynamically in run
@@ -98,19 +121,29 @@ zoomss_setup <- function(param){
     # Phytoplankton feeding parameters (for maintaining compatibility)
     phyto_theta = matrix(1, nrow = param$ngrps, ncol = param$ngrid, byrow = TRUE),
 
+    # Time series output arrays
     time = array(NA, dim = c(param$nsave)), # time values corresponding to saved results
     N = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # dynamic abundance spectrum
     Z = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Total mortality
     gg = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Growth
-    diet = array(NA, dim = c(param$nsave, c(param$ngrps), c(param$ngrps+3))) # diet
+    diet = array(NA, dim = c(param$nsave, param$ngrps, param$ngrps + 3)), # diet
 
+    # ==========================================================================
+    # REPRODUCTION OUTPUT ARRAYS (fish only)
+    # ==========================================================================
+    repro_rate = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Reproductive investment rate
+    SSB = array(NA, dim = c(param$nsave, param$num_fish)),  # Spawning Stock Biomass per fish group
+    recruitment = array(NA, dim = c(param$nsave, param$num_fish)), # Recruitment flux per fish group
+    total_repro_output = array(NA, dim = c(param$nsave, param$num_fish)) # Total reproductive output per fish group
   )
 
   # Set phyto_theta for carnivores
   model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0 # Carnivorous groups can't eat phyto
 
-  # GGE for different groups
-  assim_phyto <- (param$Groups$GrossGEscale) * param$cc_phyto # Phytoplankton
+  # Calculate assimilation efficiency for phytoplankton (used in kernel calculations)
+  # Assimilation from phyto = (1 - def_phyto) * K_growth
+  # For kernel pre-multiplication, we use K_growth * (1 - def_phyto)
+  assim_phyto <- param$Groups$K_growth * (1 - param$def_phyto)
 
   #### INITIAL DYNAMIC POPULATION ABUNDANCES
   # Use the first time step for initial conditions
@@ -268,7 +301,13 @@ zoomss_setup <- function(param){
   # Transform mortkernel dimensions to match original model expectations
   model$dynam_mortkernel <- aperm(model$dynam_mortkernel, c(2,1,3))
 
-  ## Incorporate carnivory (groups that can't eat phyto), temperature effects and gross growth efficiency (assim)
+  ## Incorporate carnivory (groups that can't eat phyto) for phytoplankton kernels
+  ## NOTE: In the new energy budget, we do NOT pre-multiply with assimilation efficiency
+  ## Instead, we apply energy budget (defecation, growth fraction) in zoomss_run
+  ## This allows for prey-specific defecation based on Carbon content
+
+  # For phytoplankton: still apply phyto_theta (carnivore mask) and assim_phyto
+  # because phyto defecation is constant (not prey-group-specific within phyto)
   model$phyto_growthkernel <- sweep(sweep(model$phyto_growthkernel, c(1,2), model$phyto_theta, "*"), 1, assim_phyto, "*")
   model$phyto_diffkernel <- sweep(sweep(model$phyto_diffkernel, c(1,2), model$phyto_theta, "*"), 1, assim_phyto^2, "*")
   model$phyto_dietkernel <- sweep(sweep(model$phyto_dietkernel, c(1,2), model$phyto_theta, "*"), 1, 1, "*")
@@ -279,6 +318,31 @@ zoomss_setup <- function(param){
   ## Convert diet kernel to 4D for proper calculation (consistent with model structure)
   # We need four dimensions for diet matrix: pred groups x pred sizes x prey groups x prey sizes
   model$dynam_dietkernel <- sweep(dynam_theta, c(1,2,4), model$dynam_dietkernel, "*")
+
+  # ==========================================================================
+  # PRE-CALCULATE PREY-SPECIFIC DEFECATION SCALING FOR DYNAMIC SPECTRUM
+  # ==========================================================================
+  # def_prey[j] = def_high + (def_low - def_high) * (1 - Carbon[j] / Carbon_max)
+  # This gives defecation fraction for predator when eating prey group j
+  # Lower Carbon = higher defecation (lower quality food)
+
+  # Create matrix of defecation by predator (row) and prey (col)
+  # Uses predator's def_high and def_low, scaled by prey's Carbon
+  model$def_by_prey <- matrix(NA, nrow = param$ngrps, ncol = param$ngrps)
+  for (pred in 1:param$ngrps) {
+    for (prey in 1:param$ngrps) {
+      carbon_fraction <- model$prey_Carbon[prey] / model$Carbon_max
+      model$def_by_prey[pred, prey] <- model$def_high[pred] +
+        (model$def_low[pred] - model$def_high[pred]) * (1 - carbon_fraction)
+    }
+  }
+
+  # Pre-calculate assimilation efficiency by predator-prey combination
+  # assim_by_prey[pred, prey] = (1 - def_by_prey[pred, prey]) * K_growth[pred]
+  model$assim_by_prey <- matrix(NA, nrow = param$ngrps, ncol = param$ngrps)
+  for (pred in 1:param$ngrps) {
+    model$assim_by_prey[pred, ] <- (1 - model$def_by_prey[pred, ]) * model$K_growth[pred]
+  }
 
   return(model)
 } # End of Setup function

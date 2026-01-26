@@ -326,3 +326,517 @@ plotEnvironment <- function(env_data) {
   }
 }
 
+
+#' Plot Reproduction Time Series
+#'
+#' @title Visualize fish reproduction metrics through time
+#' @description Creates time series plots showing spawning stock biomass (SSB),
+#'   recruitment, and total reproductive output for fish functional groups.
+#' @details This function visualizes key fish reproduction metrics including:
+#'   - **SSB (Spawning Stock Biomass)**: Total biomass of mature individuals
+#'   - **Recruitment**: Number of new recruits entering the smallest size class
+#'   - **Reproductive Output**: Total reproductive investment (biomass allocated to reproduction)
+#'
+#'   These metrics are essential for understanding population dynamics driven by
+#'   the explicit energy budget and reproduction system.
+#'
+#' @param mdl ZooMSS results object containing model outputs with reproduction data
+#' @param by Character string specifying the metric to plot. Options:
+#'   "SSB" (Spawning Stock Biomass), "recruitment", "repro_output" (default: "SSB")
+#' @param transform Character vector of the required y-axis transformation.
+#'   Options from `scale_*_continuous` (Default: "identity")
+#'
+#' @return ggplot object showing the requested reproduction time series by fish group
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#'
+#' # Plot different reproduction metrics
+#' ssb_plot <- plotReproduction(results, by = "SSB")
+#' recruitment_plot <- plotReproduction(results, by = "recruitment")
+#' repro_plot <- plotReproduction(results, by = "repro_output")
+#' }
+#'
+plotReproduction <- function(mdl, by = "SSB", transform = "identity") {
+
+  # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  assertthat::assert_that(
+    "SSB" %in% names(mdl),
+    msg = "Reproduction data not available. Ensure model was run with fish groups that have repro_on = 1."
+  )
+
+  assertthat::assert_that(
+    by %in% c("SSB", "recruitment", "repro_output"),
+    msg = paste0("'by' must be one of: ", paste(c("SSB", "recruitment", "repro_output"), collapse = ", "))
+  )
+
+  assertthat::assert_that(
+    transform %in% c("identity", "log", "log10", "log1p", "log2"),
+    msg = paste0("'transform' must be one of: ", paste(c("identity", "log", "log10", "log1p", "log2"), collapse = ", "))
+  )
+
+  # Get fish group names
+  fish_grps <- mdl$param$fish_grps
+  fish_names <- mdl$param$Groups$Species[fish_grps]
+  fish_colors <- mdl$param$Groups$PlotColour[fish_grps]
+  names(fish_colors) <- fish_names
+
+  # Select data based on metric
+  data_matrix <- switch(by,
+                        "SSB" = mdl$SSB,
+                        "recruitment" = mdl$recruitment,
+                        "repro_output" = mdl$total_repro_output)
+
+  # Create data frame
+  colnames(data_matrix) <- fish_names
+  data_df <- tibble::as_tibble(data_matrix)
+  data_df$Time <- mdl$time
+
+  # Convert to long format
+  data_long <- data_df %>%
+    tidyr::pivot_longer(-"Time", names_to = "Species", values_to = by) %>%
+    dplyr::filter(!is.na(!!rlang::sym(by))) %>%
+    dplyr::mutate(Species = factor(.data$Species, levels = fish_names))
+
+  # Create y-axis label
+  y_label <- switch(by,
+                    "SSB" = "Spawning Stock Biomass",
+                    "recruitment" = "Recruitment (individuals)",
+                    "repro_output" = "Total Reproductive Output")
+
+  # Create plot
+  gg <- ggplot2::ggplot(data = data_long,
+                        mapping = ggplot2::aes(x = .data$Time,
+                                               y = !!rlang::sym(by),
+                                               colour = .data$Species)) +
+    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::scale_color_manual(values = fish_colors) +
+    ggplot2::scale_y_continuous(transform = transform) +
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(y = y_label, x = "Time (years)",
+                  subtitle = paste("Fish", y_label))
+
+  return(gg)
+}
+
+
+#' Plot Reproduction Size Spectra
+#'
+#' @title Visualize reproductive investment across body sizes
+#' @description Creates plots showing how reproductive investment is distributed
+#'   across body sizes for fish functional groups.
+#' @details This function visualizes:
+#'   - Reproductive rate as a function of body size
+#'   - The effect of the maturity ogive on reproduction allocation
+#'   - Size-dependent patterns in reproductive investment
+#'
+#'   The plot shows the specific reproductive rate (g reproduction / g body weight / time)
+#'   at each body size, averaged over the specified number of years.
+#'
+#' @param mdl ZooMSS results object containing model outputs with reproduction data
+#' @param n_years The number of years (from the end) over which to average (default: 10)
+#'
+#' @return ggplot object showing reproductive rate vs body size by fish group
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#' repro_size_plot <- plotReproSizeSpectra(results, n_years = 10)
+#' }
+#'
+plotReproSizeSpectra <- function(mdl, n_years = 10) {
+
+  # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  assertthat::assert_that(
+    "repro_rate" %in% names(mdl),
+    msg = "Reproduction rate data not available."
+  )
+
+  # Get fish groups
+  fish_grps <- mdl$param$fish_grps
+  fish_names <- mdl$param$Groups$Species[fish_grps]
+  fish_colors <- mdl$param$Groups$PlotColour[fish_grps]
+  names(fish_colors) <- fish_names
+
+  # Average reproductive rate over final n_years
+  repro_avg <- averageTimeSeries(mdl, var = "repro_rate", n_years = n_years)
+
+  # Subset to fish groups only
+  repro_fish <- repro_avg[fish_grps, , drop = FALSE]
+  rownames(repro_fish) <- fish_names
+
+  # Create data frame
+  species_df <- tibble::as_tibble(t(repro_fish))
+  species_df <- species_df %>%
+    tibble::add_column("Weight" = mdl$param$w) %>%
+    tidyr::pivot_longer(-"Weight", names_to = "Species", values_to = "repro_rate") %>%
+    dplyr::filter(.data$repro_rate > 0) %>%
+    dplyr::mutate(Species = factor(.data$Species, levels = fish_names))
+
+  # Create plot
+  gg <- ggplot2::ggplot(data = species_df,
+                        mapping = ggplot2::aes(x = log10(.data$Weight),
+                                               y = .data$repro_rate,
+                                               colour = .data$Species)) +
+    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::geom_point(size = 1) +
+    ggplot2::scale_color_manual(values = fish_colors) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = expression(log[10] ~ "Body Weight (g)"),
+                  y = expression("Reproductive Rate (" * yr^-1 * ")"),
+                  subtitle = "Fish Reproductive Investment by Size")
+
+  return(gg)
+}
+
+
+#' Plot Growth Rate Comparison
+#'
+#' @title Compare growth rates across functional groups
+#' @description Creates comparative plots of growth rates for fish and zooplankton
+#'   groups, useful for analyzing energy budget effects on growth.
+#' @details This function visualizes growth rate patterns by:
+#'   - Showing size-dependent growth rates for each group
+#'   - Allowing comparison between zooplankton and fish groups
+#'   - Highlighting differences due to energy budget parameterisation
+#'
+#' @param mdl ZooMSS results object containing model outputs
+#' @param groups Character string specifying which groups to plot.
+#'   Options: "fish", "zooplankton", "all" (default: "all")
+#' @param n_years The number of years (from the end) over which to average (default: 10)
+#'
+#' @return ggplot object showing growth rate vs body size by group
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#'
+#' # Compare growth rates
+#' all_growth <- plotGrowthComparison(results, groups = "all")
+#' fish_growth <- plotGrowthComparison(results, groups = "fish")
+#' zoo_growth <- plotGrowthComparison(results, groups = "zooplankton")
+#' }
+#'
+plotGrowthComparison <- function(mdl, groups = "all", n_years = 10) {
+
+  # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  assertthat::assert_that(
+    groups %in% c("fish", "zooplankton", "all"),
+    msg = "'groups' must be one of: fish, zooplankton, all"
+  )
+
+  # Get group indices
+  if (groups == "fish") {
+    grp_idx <- mdl$param$fish_grps
+  } else if (groups == "zooplankton") {
+    grp_idx <- mdl$param$zoo_grps
+  } else {
+    grp_idx <- seq_len(mdl$param$ngrps)
+  }
+
+  grp_names <- mdl$param$Groups$Species[grp_idx]
+  grp_colors <- mdl$param$Groups$PlotColour[grp_idx]
+  names(grp_colors) <- grp_names
+
+  # Average growth over final n_years
+  growth_avg <- averageTimeSeries(mdl, var = "growth", n_years = n_years)
+
+  # Subset to requested groups
+  growth_subset <- growth_avg[grp_idx, , drop = FALSE]
+  rownames(growth_subset) <- grp_names
+
+  # Create data frame
+  species_df <- tibble::as_tibble(t(growth_subset))
+  species_df <- species_df %>%
+    tibble::add_column("Weight" = mdl$param$w) %>%
+    tidyr::pivot_longer(-"Weight", names_to = "Species", values_to = "growth") %>%
+    dplyr::filter(.data$growth > 0) %>%
+    dplyr::mutate(Species = factor(.data$Species, levels = grp_names))
+
+  # Create plot
+  subtitle_text <- switch(groups,
+                          "fish" = "Fish Growth Rates by Size",
+                          "zooplankton" = "Zooplankton Growth Rates by Size",
+                          "all" = "Growth Rates by Size (All Groups)")
+
+  gg <- ggplot2::ggplot(data = species_df,
+                        mapping = ggplot2::aes(x = log10(.data$Weight),
+                                               y = log10(.data$growth),
+                                               colour = .data$Species)) +
+    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::scale_color_manual(values = grp_colors) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = expression(log[10] ~ "Body Weight (g)"),
+                  y = expression(log[10] ~ "Specific Growth Rate (" * yr^-1 * ")"),
+                  subtitle = subtitle_text)
+
+  return(gg)
+}
+
+
+#' Plot Defecation Rates by Prey Type
+#'
+#' @title Visualize prey-dependent defecation rates
+#' @description Creates a plot showing how defecation rates vary with prey Carbon
+#'   content, illustrating the continuous food quality scaling in the energy budget.
+#' @details This function visualizes the prey-dependent defecation rates calculated
+#'   using the formula:
+#'   \deqn{D_{prey} = D_{high} + (D_{low} - D_{high}) \times (1 - C_{prey}/C_{max})}
+#'
+#'   The plot shows:
+#'   - Each prey group's Carbon content and resulting defecation fraction
+#'   - The continuous relationship between Carbon and defecation
+#'   - The defecation range (def_high to def_low)
+#'
+#' @param mdl ZooMSS results object containing model outputs and parameters
+#'
+#' @return ggplot object showing defecation rate vs prey Carbon content
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#' defecation_plot <- plotDefecation(results)
+#' }
+#'
+plotDefecation <- function(mdl) {
+
+ # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  assertthat::assert_that(
+    "def_by_prey" %in% names(mdl),
+    msg = "Defecation data not available. Ensure model has energy budget parameters."
+  )
+
+  # Get parameters
+  groups <- mdl$param$Groups
+  ngrps <- mdl$param$ngrps
+  Carbon <- groups$Carbon
+  Carbon_max <- max(Carbon)
+
+  # Calculate defecation for each prey (using first predator as reference)
+  def_high <- groups$def_high[1]
+  def_low <- groups$def_low[1]
+
+  # Create data frame
+  def_data <- data.frame(
+    species = groups$Species,
+    Carbon = Carbon,
+    defecation = def_high + (def_low - def_high) * (1 - Carbon / Carbon_max),
+    type = groups$Type
+  )
+
+  # Order by Carbon content
+
+  def_data <- def_data[order(def_data$Carbon), ]
+  def_data$species <- factor(def_data$species, levels = def_data$species)
+
+  # Get colours
+  plot_colours <- groups$PlotColour
+  names(plot_colours) <- groups$Species
+
+  # Create plot
+  gg <- ggplot2::ggplot(def_data, ggplot2::aes(x = .data$Carbon, y = .data$defecation,
+                                                colour = .data$species)) +
+    ggplot2::geom_point(size = 4) +
+    ggplot2::geom_line(ggplot2::aes(group = 1), colour = "grey50", linetype = "dashed") +
+    ggplot2::geom_text(ggplot2::aes(label = .data$species), hjust = -0.1, vjust = 0.5, size = 3) +
+    ggplot2::scale_colour_manual(values = plot_colours) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(legend.position = "none") +
+    ggplot2::labs(x = expression("Prey Carbon Content (g C g"^-1 ~ "wet weight)"),
+                  y = "Defecation Fraction",
+                  title = "Defecation Rate by Prey Quality",
+                  subtitle = paste0("D ranges from ", def_high, " (high-C prey) to ",
+                                   def_low, " (low-C prey)")) +
+    ggplot2::xlim(0, max(Carbon) * 1.5) +
+    ggplot2::ylim(def_high - 0.05, def_low + 0.05)
+
+  return(gg)
+}
+
+
+#' Plot Energy Budget Fractions
+#'
+#' @title Visualize energy budget allocation across groups
+#' @description Creates a stacked bar plot showing how assimilated energy is
+#'   partitioned into metabolism, growth, and reproduction for each functional group.
+#' @details This function visualizes the energy budget fractions:
+#'   - **f_M**: Metabolic fraction (maintenance costs)
+#'   - **K_growth**: Growth fraction (somatic growth)
+#'   - **R_frac**: Reproduction fraction (reproductive investment, fish only)
+#'
+#'   The constraint f_M + K_growth + R_frac = 1 ensures all assimilated energy
+#'   is accounted for.
+#'
+#' @param mdl ZooMSS results object containing model outputs and parameters
+#'
+#' @return ggplot object showing energy budget allocation by group
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#' energy_plot <- plotEnergyBudget(results)
+#' }
+#'
+plotEnergyBudget <- function(mdl) {
+
+  # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  # Get parameters
+  groups <- mdl$param$Groups
+  ngrps <- mdl$param$ngrps
+
+  # Calculate R_frac
+  R_frac <- 1 - groups$f_M - groups$K_growth
+
+  # Create data frame for stacked bar
+  energy_data <- data.frame(
+    species = rep(groups$Species, 3),
+    fraction = c(groups$f_M, groups$K_growth, R_frac),
+    component = factor(rep(c("Metabolism (f_M)", "Growth (K)", "Reproduction (R_frac)"),
+                          each = ngrps),
+                      levels = c("Reproduction (R_frac)", "Growth (K)", "Metabolism (f_M)"))
+  )
+
+  # Set species order
+  energy_data$species <- factor(energy_data$species, levels = groups$Species)
+
+  # Define colours for components
+  component_colours <- c("Metabolism (f_M)" = "#E41A1C",
+                        "Growth (K)" = "#377EB8",
+                        "Reproduction (R_frac)" = "#4DAF4A")
+
+  # Create plot
+  gg <- ggplot2::ggplot(energy_data,
+                        ggplot2::aes(x = .data$species, y = .data$fraction,
+                                     fill = .data$component)) +
+    ggplot2::geom_bar(stat = "identity", position = "stack") +
+    ggplot2::scale_fill_manual(values = component_colours) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
+    ggplot2::labs(x = "Functional Group",
+                  y = "Fraction of Assimilated Energy",
+                  title = "Energy Budget Allocation by Group",
+                  fill = "Component",
+                  subtitle = "Showing f_M + K + R_frac = 1")
+
+  return(gg)
+}
+
+
+#' Plot Assimilation Efficiency Matrix
+#'
+#' @title Visualize prey-specific assimilation efficiencies
+#' @description Creates a heatmap showing the net assimilation efficiency
+#'   (accounting for both defecation and growth fraction) for each predator-prey
+#'   combination.
+#' @details This function visualizes the assim_by_prey matrix which represents:
+#'   \deqn{assim_{pred,prey} = (1 - D_{prey}) \times K_{pred}}
+#'
+#'   This is the fraction of ingested prey biomass that contributes to predator
+#'   somatic growth, combining prey digestibility and predator growth efficiency.
+#'
+#' @param mdl ZooMSS results object containing model outputs and parameters
+#'
+#' @return ggplot object showing assimilation efficiency heatmap
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # After running ZooMSS model
+#' results <- zoomss_model(input_params, Groups)
+#' assim_plot <- plotAssimilationMatrix(results)
+#' }
+#'
+plotAssimilationMatrix <- function(mdl) {
+
+  # Validate inputs
+  assertthat::assert_that(
+    is.list(mdl),
+    msg = "mdl must be a list."
+  )
+
+  assertthat::assert_that(
+    "assim_by_prey" %in% names(mdl),
+    msg = "Assimilation matrix not available."
+  )
+
+  # Get data
+  assim_matrix <- mdl$assim_by_prey
+  species <- mdl$param$Groups$Species
+  carbon <- mdl$param$Groups$Carbon
+  group_type <- mdl$param$Groups$Type
+  ngrps <- mdl$param$ngrps
+
+  # Order prey by Carbon content (low to high)
+  prey_order <- species[order(carbon)]
+  
+  # Order predators by type (Zooplankton first, then Fish) and Carbon within type
+  pred_order <- species[order(group_type, carbon)]
+
+  # Convert to long format
+  assim_long <- expand.grid(
+    predator = species,
+    prey = species
+  )
+  assim_long$efficiency <- as.vector(assim_matrix)
+
+  # Set factor levels based on Carbon ordering
+  assim_long$predator <- factor(assim_long$predator, levels = pred_order)
+  assim_long$prey <- factor(assim_long$prey, levels = prey_order)
+
+  # Create heatmap
+  gg <- ggplot2::ggplot(assim_long,
+                        ggplot2::aes(x = .data$prey, y = .data$predator,
+                                     fill = .data$efficiency)) +
+    ggplot2::geom_tile() +
+    ggplot2::geom_text(ggplot2::aes(label = round(.data$efficiency, 3)),
+                       size = 2.5, colour = "white") +
+    ggplot2::scale_fill_viridis_c(option = "plasma", limits = c(0, 0.5)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
+    ggplot2::labs(x = "Prey Group (ordered by Carbon content)",
+                  y = "Predator Group",
+                  fill = "Growth\nEfficiency",
+                  title = "Prey-Specific Growth Efficiency",
+                  subtitle = expression("(1 - D"[prey]*") × K"[predator]))
+
+  return(gg)
+}
+
+

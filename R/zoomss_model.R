@@ -29,9 +29,15 @@
 #'     \item param: Model parameters and environmental forcing data
 #'     \item time: Time values corresponding to saved results (accounting for isave)
 #'     \item abundance: Abundance time series (time x groups x size classes)
-#'     \item growth: Growth rate time series
+#'     \item growth: Growth rate time series (post-reproduction adjustment)
 #'     \item mortality: Mortality rate time series
 #'     \item diet: Diet composition time series
+#'     \item repro_rate: Reproduction rate time series (time x groups x size classes)
+#'     \item SSB: Spawning stock biomass time series (time x fish groups)
+#'     \item recruitment: Recruitment flux time series (time x fish groups)
+#'     \item total_repro_output: Total reproductive output time series (time x fish groups)
+#'     \item biomass: Wet weight biomass by group and size
+#'     \item biomassC: Carbon biomass by group and size
 #'     \item Additional model structure and kernel data
 #'   }
 #' @export
