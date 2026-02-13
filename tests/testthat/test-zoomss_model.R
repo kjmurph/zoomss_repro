@@ -39,6 +39,11 @@ non_default_groups <- data.frame(
     Fmort_W0 = c(-8.0, 0.0),  # Use exact values that match w_log10 grid
     Fmort_Wmax = c(-6.0, 3.0),  # Use exact values that match w_log10 grid
     PlotColour = c("blue", "red"),
+    AssimCategory = c("Protist", "Fish"),
+    Kappa = c(0.7, NA),
+    MetabConst = c(0, 0),
+    MetabExp = c(0.75, 0.75),
+    StarvSens = c(0.3, 0.3),
     stringsAsFactors = FALSE
   )
 

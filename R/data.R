@@ -6,7 +6,7 @@
 #'   These represent various taxa from flagellates to large fish, each defined
 #'   by their feeding behavior, size ranges, and physiological parameters.
 #'
-#' @format A data frame with 12 rows (functional groups) and 19 columns:
+#' @format A data frame with 12 rows (functional groups) and 24 columns:
 #' \describe{
 #'   \item{Species}{Character. Name of the functional group/taxa}
 #'   \item{Type}{Character. Broad category (Zooplankton or Fish)}
@@ -20,13 +20,18 @@
 #'   \item{PPMRscale}{Numeric. Predator-prey mass ratio scaling parameter}
 #'   \item{PPMR}{Numeric. Predator-prey mass ratio (for fish groups)}
 #'   \item{FeedWidth}{Numeric. Feeding kernel width parameter}
-#'   \item{GrossGEscale}{Numeric. Gross growth efficiency scaling}
-#'   \item{Carbon}{Numeric. Carbon content proportion}
+#'   \item{GrossGEscale}{Numeric. Gross growth efficiency scaling (retained for backward compatibility)}
+#'   \item{Carbon}{Numeric. Carbon:wet-weight ratio (gC/gww)}
 #'   \item{Repro}{Numeric. Reproduction parameter}
 #'   \item{Fmort}{Numeric. Fishing mortality rate}
 #'   \item{Fmort_W0}{Numeric. Log10 minimum weight for fishing mortality}
 #'   \item{Fmort_Wmax}{Numeric. Log10 maximum weight for fishing mortality}
 #'   \item{PlotColour}{Character. Color code for plotting the functional group}
+#'   \item{AssimCategory}{Character. Prey assimilation category: Protist, Crustacean, MuscularInvert, Gelatinous, or Fish}
+#'   \item{Kappa}{Numeric. Growth allocation fraction (0-1). NA for fish (computed from maturation function)}
+#'   \item{MetabConst}{Numeric. Metabolic constant m_i for allometric maintenance (0 = not yet calibrated)}
+#'   \item{MetabExp}{Numeric. Metabolic allometric exponent n_i (default 0.75)}
+#'   \item{StarvSens}{Numeric. Starvation mortality sensitivity parameter s_i (default 0.3)}
 #' }
 #'
 #' @details The GroupInputs dataset defines 12 functional groups spanning from

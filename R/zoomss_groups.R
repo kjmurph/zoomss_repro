@@ -245,6 +245,30 @@ validateGroups <- function(groups) {
   assertthat::assert_that(all(groups$Fmort >= 0),
                          msg = "Fmort (fishing mortality) must be non-negative")
 
+  # Check new energy budget columns exist
+  new_required <- c("AssimCategory", "Kappa", "MetabConst", "MetabExp", "StarvSens")
+  missing_new <- setdiff(new_required, names(groups))
+  assertthat::assert_that(length(missing_new) == 0,
+    msg = paste("Missing energy budget columns:", paste(missing_new, collapse = ", ")))
+
+  # Validate AssimCategory values
+  valid_categories <- c("Protist", "Crustacean", "MuscularInvert", "Gelatinous", "Fish")
+  assertthat::assert_that(all(groups$AssimCategory %in% valid_categories),
+    msg = paste("AssimCategory must be one of:", paste(valid_categories, collapse = ", ")))
+
+  # Validate Kappa (NA allowed for fish)
+  zoo_kappa <- groups$Kappa[groups$Type == "Zooplankton"]
+  assertthat::assert_that(all(!is.na(zoo_kappa) & zoo_kappa > 0 & zoo_kappa <= 1),
+    msg = "Zooplankton Kappa must be between 0 and 1")
+
+  # Validate MetabExp
+  assertthat::assert_that(all(!is.na(groups$MetabExp) & groups$MetabExp > 0),
+    msg = "MetabExp must be positive")
+
+  # Validate StarvSens
+  assertthat::assert_that(all(!is.na(groups$StarvSens) & groups$StarvSens >= 0),
+    msg = "StarvSens must be non-negative")
+
   message("Functional groups validation passed")
   return(invisible(TRUE))
 }

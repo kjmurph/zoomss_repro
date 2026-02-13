@@ -160,6 +160,33 @@ zoomss_params <- function(Groups, input_params, isave){
   param2$ngrid <- length(param2$w) # total number of size classes for zoo and fish
   param2$ngridPP <- length(param2$w_phyto) # total number of size classes for phyto
 
+  # ---- NEW ENERGY BUDGET PARAMETERS ----
+
+  # Prey-type assimilation efficiency lookup
+  alpha_lookup <- c(Protist = 0.75, Crustacean = 0.70, MuscularInvert = 0.65,
+                    Gelatinous = 0.50, Fish = 0.80)
+  param2$alpha_j <- as.numeric(alpha_lookup[Groups$AssimCategory])  # alpha_j per group as prey
+
+  # Prey-side assimilation: alpha_j * C_j (replaces GrossGEscale * Carbon)
+  param2$assim_prey <- param2$alpha_j * Groups$Carbon  # length 12
+
+  # Phytoplankton assimilation: alpha_phyto * C_phyto (protist category)
+  param2$assim_phyto <- 0.75 * param$cc_phyto  # 0.75 * 0.1 = 0.075
+
+  # Predator carbon content vector (for C_j/C_i division in run loop)
+  param2$carbon_i <- Groups$Carbon  # length 12
+
+  # Kappa: growth allocation fraction
+  param2$kappa <- Groups$Kappa
+  param2$kappa[is.na(param2$kappa)] <- 0.7  # Placeholder for fish until Phase 3
+
+  # Metabolic parameters
+  param2$metab_const <- Groups$MetabConst  # m_i values (0 until calibrated)
+  param2$metab_exp <- Groups$MetabExp      # n_i exponents (default 0.75)
+
+  # Starvation sensitivity
+  param2$starv_sens <- Groups$StarvSens    # s_i values (default 0.3)
+
   # Final parameter combination
   # Exclude time series vectors from input_params since they're now stored as _ts arrays in param2
   input_params_filtered <- input_params[!names(input_params) %in% c("tmax", "dt", "isave", "time_step", "phyto_int", "phyto_slope", "phyto_max")]

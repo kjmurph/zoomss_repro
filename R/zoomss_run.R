@@ -73,6 +73,9 @@ zoomss_run <- function(model){
   dynam_growthkernel <- model$dynam_growthkernel
   dynam_mortkernel <- model$dynam_mortkernel
   dynam_diffkernel <- model$dynam_diffkernel
+  carbon_i <- model$carbon_i
+  kappa <- model$kappa
+  metab_cost <- model$metab_cost
 
   # Get pre-calculated phytoplankton and temperature time series from param
   phyto_int <- param$phyto_int
@@ -170,14 +173,34 @@ zoomss_run <- function(model){
     cs <- .colSums(growth_multiplier * t(temp_growth_kernel), m = ngrid, n = ngrps*ngrid)
     dim(cs) <- c(ngrps, ngrid)
 
-    gg <- current_ingested_phyto + cs
+    # Total ingested (prey-side assimilation: alpha_j * C_j baked in via assim_eff)
+    ingested_total <- current_ingested_phyto + cs
+
+    # Convert to predator wet-weight equivalent by dividing by C_i
+    assimilated <- sweep(ingested_total, 1, carbon_i, '/')
+
+    # Subtract mass-specific maintenance cost: m_i * w^(n-1) * tau(T)
+    maint_mass_specific <- metab_cost * model$temp_eff
+    maint_mass_specific <- sweep(maint_mass_specific, 2, w, '/')
+    E_avail <- assimilated - maint_mass_specific
+
+    # Apply kappa and floor at zero for growth
+    gg <- kappa * pmax(E_avail, 0)
+
+    # Starvation mortality where E_avail < 0
+    model$starv_mort[] <- 0
+    starving <- E_avail < 0
+    if (any(starving)) {
+      model$starv_mort[starving] <- param$starv_sens[row(E_avail)[starving]] *
+        abs(E_avail[starving]) / pmax(maint_mass_specific[starving], 1e-30)
+    }
 
     ### DO MORTALITY
 
     sw2 <- sweep(dynam_mortkernel, c(2,3), predation_multiplier, '*') # n_sizes x n_species x n_sizes
     ap2 <- aperm(sw2, c(2,3,1))
     M2 <- .colSums(colSums(ap2),ngrid,ngrid) # 1 x n_sizes
-    Z <- sweep(model$M_sb + model$fish_mort, 2, M2, '+') # Total dynamic spectrum mortality (n_species x n_sizes)
+    Z <- sweep(model$M_sb + model$fish_mort + model$starv_mort, 2, M2, '+') # Total dynamic spectrum mortality (n_species x n_sizes)
     rm(sw2, ap2)
 
 
@@ -188,6 +211,7 @@ zoomss_run <- function(model){
     cs <- .colSums(diffusion_multiplier * t(temp_diff_kernel), m = ngrid, n = ngrps*ngrid)
     dim(cs) <- c(ngrps, ngrid)
     diff <- current_diff_phyto + cs
+    diff <- sweep(diff, 1, carbon_i^2, '/') # Apply C_i^2 conversion (matches C_i treatment in growth)
 
     ### MvF WITH DIFFUSION ALGORITHM
     # Numerical implementation matrices (for MvF without diffusion)

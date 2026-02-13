@@ -88,8 +88,20 @@ zoomss_setup <- function(param){
     M_sb_base = matrix(0, nrow = param$ngrps, ncol = param$ngrid), # base senescence mortality (before temp effect)
     fish_mort = matrix(0, nrow = param$ngrps, ncol = param$ngrid), # fishing mortality
 
-    # Assimilation efficiency (constant)
-    assim_eff = matrix(param$Groups$GrossGEscale * param$Groups$Carbon, nrow = param$ngrps, ncol = length(param$w)),
+    # Prey-side assimilation: alpha_j * C_j for each group (replaces GrossGEscale * Carbon)
+    assim_eff = matrix(param$assim_prey, nrow = param$ngrps, ncol = length(param$w)),
+
+    # Predator carbon content vector for C_j/C_i conversion
+    carbon_i = param$carbon_i,
+
+    # Kappa: growth allocation fraction (ngrps x ngrid)
+    kappa = matrix(param$kappa, nrow = param$ngrps, ncol = param$ngrid),
+
+    # Metabolic cost: m_i * w^n_i (ngrps x ngrid), scaled by tau(T)/w in run loop
+    metab_cost = matrix(0, nrow = param$ngrps, ncol = param$ngrid),
+
+    # Starvation mortality (computed each timestep in run loop)
+    starv_mort = matrix(0, nrow = param$ngrps, ncol = param$ngrid),
 
     # Temperature effects matrix - initialize with first timestep values
     temp_eff = matrix(1, nrow = param$ngrps, ncol = param$ngrid), # Will be updated dynamically in run
@@ -109,8 +121,20 @@ zoomss_setup <- function(param){
   # Set phyto_theta for carnivores
   model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0 # Carnivorous groups can't eat phyto
 
-  # GGE for different groups
-  assim_phyto <- (param$Groups$GrossGEscale) * param$cc_phyto # Phytoplankton
+  # Pre-compute metabolic cost matrix and zero kappa outside size ranges
+  for (i in 1:param$ngrps) {
+    if (!is.na(param$metab_const[i]) && param$metab_const[i] > 0) {
+      model$metab_cost[i, ] <- param$metab_const[i] * param$w^param$metab_exp[i]
+      model$metab_cost[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
+      model$metab_cost[i, 10^(param$Groups$W0[i]) > param$w] <- 0
+    }
+    # Zero kappa outside each group's size range to prevent NaN propagation
+    model$kappa[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
+    model$kappa[i, 10^(param$Groups$W0[i]) > param$w] <- 0
+  }
+
+  # Phytoplankton assimilation: alpha_phyto * C_phyto (replaces GrossGEscale * cc_phyto)
+  assim_phyto <- rep(param$assim_phyto, param$ngrps) # 0.075 for all groups
 
   #### INITIAL DYNAMIC POPULATION ABUNDANCES
   # Use the first time step for initial conditions
