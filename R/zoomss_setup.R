@@ -129,6 +129,11 @@ zoomss_setup <- function(param){
     diet = array(NA, dim = c(param$nsave, param$ngrps, param$ngrps + 3)), # diet
 
     # ==========================================================================
+    # ENERGY BUDGET OUTPUT ARRAYS
+    # ==========================================================================
+    gg_total = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Total assimilated energy (before K_growth partitioning)
+
+    # ==========================================================================
     # REPRODUCTION OUTPUT ARRAYS (fish only)
     # ==========================================================================
     repro_rate = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Reproductive investment rate
@@ -141,9 +146,9 @@ zoomss_setup <- function(param){
   model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0 # Carnivorous groups can't eat phyto
 
   # Calculate assimilation efficiency for phytoplankton (used in kernel calculations)
-  # Assimilation from phyto = (1 - def_phyto) * K_growth
-  # For kernel pre-multiplication, we use K_growth * (1 - def_phyto)
-  assim_phyto <- param$Groups$K_growth * (1 - param$def_phyto)
+  # This is pure assimilation only: (1 - defecation). K_growth partitioning happens
+  # post-hoc in zoomss_run.R to avoid double-counting.
+  assim_phyto <- rep(1 - param$def_phyto, param$ngrps)
 
   #### INITIAL DYNAMIC POPULATION ABUNDANCES
   # Use the first time step for initial conditions
@@ -338,10 +343,12 @@ zoomss_setup <- function(param){
   }
 
   # Pre-calculate assimilation efficiency by predator-prey combination
-  # assim_by_prey[pred, prey] = (1 - def_by_prey[pred, prey]) * K_growth[pred]
+  # assim_by_prey[pred, prey] = (1 - def_by_prey[pred, prey])
+  # This is pure assimilation only. K_growth partitioning happens post-hoc
+  # in zoomss_run.R to avoid double-counting.
   model$assim_by_prey <- matrix(NA, nrow = param$ngrps, ncol = param$ngrps)
   for (pred in 1:param$ngrps) {
-    model$assim_by_prey[pred, ] <- (1 - model$def_by_prey[pred, ]) * model$K_growth[pred]
+    model$assim_by_prey[pred, ] <- (1 - model$def_by_prey[pred, ])
   }
 
   return(model)

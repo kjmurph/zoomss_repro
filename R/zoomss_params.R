@@ -166,6 +166,52 @@ zoomss_params <- function(Groups, input_params, isave){
 
   # Derived reproduction fraction (R_frac = 1 - f_M - K_growth)
   param2$R_frac <- 1 - Groups$f_M - Groups$K_growth
+  names(param2$R_frac) <- Groups$Species
+
+  # Energy budget closure validation
+  budget_sum <- Groups$f_M + Groups$K_growth + param2$R_frac
+  if (any(abs(budget_sum - 1.0) > 1e-10)) {
+    bad_groups <- Groups$Species[abs(budget_sum - 1.0) > 1e-10]
+    stop(paste("Energy budget does not sum to 1.0 for groups:",
+               paste(bad_groups, collapse = ", ")))
+  }
+  if (any(param2$R_frac < 0)) {
+    bad_groups <- Groups$Species[param2$R_frac < 0]
+    stop(paste("R_frac is negative (f_M + K_growth > 1) for groups:",
+               paste(bad_groups, collapse = ", ")))
+  }
+
+  # ──────────────────────────────────────────────────────
+  # Energy budget scenario configuration
+  # ──────────────────────────────────────────────────────
+  # "A" = Full energy budget: f_M + K_growth + R_frac for all groups
+  # "B" = R_frac = 0 for zooplankton (redistributed to K_growth)
+  #       Fish groups retain their R_frac values unchanged
+
+  energy_budget_scenario <- "A"  # Toggle: "A" or "B"
+
+  if (energy_budget_scenario == "B") {
+    zoo_idx <- param$zoo_grps
+
+    # Redistribute zooplankton R_frac to K_growth
+    Groups$K_growth[zoo_idx] <- Groups$K_growth[zoo_idx] + param2$R_frac[zoo_idx]
+    param2$R_frac[zoo_idx] <- 0.0
+
+    # Update the Groups data frame in param to stay consistent
+    param$Groups <- Groups
+
+    cat("Scenario B applied: R_frac = 0 for zooplankton groups\n")
+    cat("  Affected groups:", paste(Groups$Species[zoo_idx], collapse = ", "), "\n")
+
+    # Re-validate after scenario adjustment
+    budget_sum <- Groups$f_M + Groups$K_growth + param2$R_frac
+    stopifnot(all(abs(budget_sum - 1.0) < 1e-10))
+  }
+
+  cat("Energy budget loaded for", param$ngrps, "groups (Scenario", energy_budget_scenario, ")\n")
+  cat("  f_M range:      ", range(Groups$f_M), "\n")
+  cat("  K_growth range:  ", range(Groups$K_growth), "\n")
+  cat("  R_frac range:    ", range(param2$R_frac), "\n")
 
   # Phytoplankton defecation - continuous scaling based on cc_phyto Carbon content
   # def = def_high + (def_low - def_high) * (1 - Carbon / Carbon_max)

@@ -72,7 +72,7 @@ zoomss_run <- function(model){
   num_fish <- param$num_fish
 
   # Extract energy budget parameters
-  assim_by_prey <- model$assim_by_prey  # Pre-calculated: (1 - def) * K_growth by predator-prey pair
+  assim_by_prey <- model$assim_by_prey  # Pre-calculated: (1 - def) by predator-prey pair
   K_growth <- model$K_growth            # Growth fraction of assimilated
   R_frac <- model$R_frac                # Reproduction fraction of assimilated
   mat_ogive <- model$mat_ogive          # Maturity ogive (ngrps x ngrid)
@@ -168,7 +168,8 @@ zoomss_run <- function(model){
     # ==========================================================================
     # PHYTOPLANKTON FEEDING (pre-multiplied with assim_phyto in setup)
     # ==========================================================================
-    # These kernels already incorporate (1 - def_phyto) * K_growth
+    # These kernels incorporate (1 - def_phyto) assimilation.
+    # K_growth partitioning is applied post-hoc after gg is computed.
     current_ingested_phyto <- model$temp_eff*(rowSums(sweep(model$phyto_growthkernel, 3, model$nPP, "*"), dims = 2))
     current_diff_phyto <- model$temp_eff^2*(rowSums(sweep(model$phyto_diffkernel, 3, model$nPP, "*"), dims = 2))
 
@@ -179,7 +180,8 @@ zoomss_run <- function(model){
     # DYNAMIC SPECTRUM FEEDING WITH EXPLICIT ENERGY BUDGET
     # ==========================================================================
     # Calculate growth from dynamic spectrum with prey-specific defecation
-    # assim_by_prey[pred, prey] = (1 - def[pred,prey]) * K_growth[pred]
+    # assim_by_prey[pred, prey] = (1 - def[pred,prey])  (pure assimilation only)
+    # K_growth partitioning is applied post-hoc after gg is computed.
 
     # Growth multiplier now uses prey-specific assimilation efficiency
     # For each predator, sum over all prey: N[prey] * assim_by_prey[pred, prey]
@@ -210,40 +212,40 @@ zoomss_run <- function(model){
     }
 
     # Total growth = phytoplankton + dynamic spectrum
+    # gg here represents total ASSIMILATED energy rate (before K_growth partitioning)
     gg <- current_ingested_phyto + gg_dynam
+
+    # ==========================================================================
+    # PREDATOR-SIDE ENERGY PARTITIONING
+    # ==========================================================================
+    # gg contains total assimilated energy per group per size bin.
+    # Partition into: somatic growth (K_growth), reproduction (R_frac),
+    # and metabolic loss (f_M, implicit — not tracked).
+
+    gg_total <- gg   # Store total assimilated energy for reproduction calculation
+
+    # Apply K_growth partitioning: somatic growth only
+    gg <- sweep(gg_total, 1, K_growth, '*')
 
     # ==========================================================================
     # REPRODUCTION CALCULATION (Fish only)
     # ==========================================================================
     # For fish with repro_on = 1:
-    # - Immature individuals (mat_ogive ~ 0): all energy to growth (gg includes R_frac)
-    # - Mature individuals (mat_ogive ~ 1): R_frac goes to reproduction, not growth
+    # - Immature individuals (mat_ogive ~ 0): R_frac energy goes to growth
+    # - Mature individuals (mat_ogive ~ 1): R_frac energy goes to reproduction
 
-    # Calculate reproductive investment rate (only for fish with repro_on = 1)
     repro_rate <- matrix(0, nrow = ngrps, ncol = ngrid)
 
     for (f in 1:num_fish) {
       fg <- fish_grps[f]
-      if (repro_on[fg] == 1) {
-        # Calculate the additional growth rate that would go to immature individuals
-        # This is the R_frac portion of assimilated energy
-        # R_frac / K_growth gives the ratio of reproduction to growth allocation
+      if (repro_on[fg] == 1 && R_frac[fg] > 0) {
+        # Reproductive rate: R_frac portion of assimilated energy, scaled by maturity
+        repro_rate[fg, ] <- R_frac[fg] * gg_total[fg, ] * mat_ogive[fg, ]
 
-        # For mature fish, R_frac portion goes to reproduction instead of growth
-        # repro_rate = (R_frac / K_growth) * gg * mat_ogive
-        # This represents the reproductive investment per unit biomass
-
-        if (K_growth[fg] > 0) {
-          repro_ratio <- R_frac[fg] / K_growth[fg]
-          repro_rate[fg, ] <- repro_ratio * gg[fg, ] * mat_ogive[fg, ]
-
-          # Adjust growth: mature individuals lose R_frac portion
-          # gg_adjusted = gg * (1 - mat_ogive * R_frac/(K_growth + R_frac))
-          # Simplifies to: gg * (K_growth + R_frac*(1-mat_ogive)) / (K_growth + R_frac)
-          total_prod <- K_growth[fg] + R_frac[fg]
-          growth_frac <- (K_growth[fg] + R_frac[fg] * (1 - mat_ogive[fg, ])) / total_prod
-          gg[fg, ] <- gg[fg, ] * growth_frac
-        }
+        # For immature individuals, R_frac energy goes to growth instead
+        # gg_adjusted = K_growth * gg_total + R_frac * gg_total * (1 - mat_ogive)
+        gg[fg, ] <- K_growth[fg] * gg_total[fg, ] +
+                    R_frac[fg] * gg_total[fg, ] * (1 - mat_ogive[fg, ])
       }
     }
 
@@ -282,6 +284,10 @@ zoomss_run <- function(model){
     }
 
     diff <- current_diff_phyto + diff_dynam
+
+    # Partition diffusion by K_growth^2 for consistency with growth partitioning
+    # (diffusion scales as growth^2 in the MvF-D framework)
+    diff <- sweep(diff, 1, K_growth^2, '*')
 
     # ==========================================================================
     # McKendrick-von Foerster NUMERICAL SOLUTION
@@ -381,6 +387,7 @@ zoomss_run <- function(model){
       model$N[isav,,] <- N
       model$Z[isav,,] <- Z
       model$gg[isav,,] <- gg
+      model$gg_total[isav,,] <- gg_total  # Total assimilated energy before partitioning
       model$diet[isav,,1:3] <- cbind(pico_phyto_diet, nano_phyto_diet, micro_phyto_diet)
       model$diet[isav,,c(4:(dim(param$Groups)[1]+3))] <- dynam_diet
 
