@@ -7,10 +7,17 @@
 #          gradient at constant temperature and save steady-state diagnostics.
 #          These outputs serve as the calibration target for the revised model.
 #
+# IMPORTANT: The original zoomss package ships with incorrect Carbon values
+#   and other parameter errors in its built-in GroupInputs.rda. This script
+#   loads the original model's default Groups, then patches in the corrected
+#   values from our revised data-raw/GroupInputs.csv. This ensures the
+#   original model code runs with the correct biological parameters.
+#
 # Prerequisites:
 #   - Install the original zoomss package (uncomment the line below):
 #     remotes::install_github("MathMarEcol/zoomss")
 #   - The original package should be loaded INSTEAD of the revised version.
+#   - The corrected GroupInputs.csv must be available at data-raw/GroupInputs.csv
 #
 # Output: calibration/baseline_original_zoomss.rds
 # =============================================================================
@@ -31,8 +38,47 @@ avg_years <- 100    # Average over final 100 years
 cat("Running original ZooMSS across", length(chl_levels), "chlorophyll levels\n")
 cat("Simulation:", sim_years, "years | Averaging final:", avg_years, "years\n\n")
 
-# ── Load default groups from original package ──
-Groups <- getGroups()
+# ── Load original Groups and patch with corrected values ──
+# The original package's GroupInputs has incorrect Carbon values and other
+# parameter errors. We load its default structure (which the original model
+# code expects, including GrossGEscale, Repro, etc.) then overwrite shared
+# columns with the corrected values from our revised CSV.
+
+Groups <- getGroups()  # Original package's default Groups
+
+# Load corrected parameter values from the revised CSV
+corrected <- utils::read.csv("data-raw/GroupInputs.csv", stringsAsFactors = FALSE)
+
+# Verify species match (order must be identical)
+stopifnot(
+  "Species mismatch between original and corrected Groups" =
+    all(Groups$Species == corrected$Species)
+)
+
+# Identify columns that exist in BOTH the original and corrected data frames.
+# These are the shared biological parameters that need the corrected values.
+# New energy-budget-specific columns (def_high, def_low, f_M, K_growth, etc.)
+# only exist in the corrected CSV and are irrelevant to the original model.
+shared_cols <- intersect(names(Groups), names(corrected))
+patched_cols <- character(0)
+
+for (col in shared_cols) {
+  if (!identical(Groups[[col]], corrected[[col]])) {
+    cat("  Patching column '", col, "': original -> corrected\n", sep = "")
+    Groups[[col]] <- corrected[[col]]
+    patched_cols <- c(patched_cols, col)
+  }
+}
+
+if (length(patched_cols) == 0) {
+  cat("  No columns needed patching (original and corrected values match).\n")
+} else {
+  cat("  Patched", length(patched_cols), "column(s):", paste(patched_cols, collapse = ", "), "\n")
+}
+
+cat("\nCorrected Carbon values:\n")
+print(data.frame(Species = Groups$Species, Carbon = Groups$Carbon))
+
 zoo_idx <- which(Groups$Type == "Zooplankton")
 fish_idx <- which(Groups$Type == "Fish")
 n_zoo <- length(zoo_idx)

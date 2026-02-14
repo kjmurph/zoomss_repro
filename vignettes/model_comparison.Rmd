@@ -58,6 +58,15 @@ spawning stock biomass (SSB), egg production, and density-independent recruitmen
 > - Run the calibration scripts in `calibration/` first, which pre-compute
 >   the required outputs.
 
+> **Data correction:** The original ZooMSS package (`MathMarEcol/zoomss`) ships
+> with incorrect Carbon values and other parameter errors in its built-in
+> `GroupInputs.rda`. When generating the baseline (Section 7 / `calibration/
+> 01_generate_baseline.R`), the original model's default Groups are loaded for
+> structural compatibility (retaining `GrossGEscale`, `Repro`, etc.), then shared
+> columns are patched with the corrected values from `data-raw/GroupInputs.csv`.
+> This ensures biological parameters such as Carbon content are consistent across
+> both the original and revised model comparisons.
+
 ## 2. Parameter Mapping Table
 
 The table below maps original ZooMSS parameters to the revised energy budget:
