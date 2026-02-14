@@ -7,11 +7,17 @@
 #          gradient at constant temperature and save steady-state diagnostics.
 #          These outputs serve as the calibration target for the revised model.
 #
-# IMPORTANT: The original zoomss package ships with incorrect Carbon values
-#   and other parameter errors in its built-in GroupInputs.rda. This script
-#   loads the original model's default Groups, then patches in the corrected
-#   values from our revised data-raw/GroupInputs.csv. This ensures the
-#   original model code runs with the correct biological parameters.
+# IMPORTANT: The original zoomss package ships with several parameter errors
+#   in its built-in GroupInputs.rda that must be corrected:
+#     - Carbon content: Flagellates (0.14->0.15), Larvaceans (0.01->0.02),
+#       OmniCopepods (0.10->0.12), CarnCopepods (0.10->0.12),
+#       Euphausiids (0.11->0.12), Salps (0.01->0.02)
+#     - Fish_Large maximum size: Wmax (7->6) and Fmort_Wmax (7->6)
+#     - Flagellates minimum size: W0 (-12 -> -10.7)
+#     - CarnCopepods feeding kernel width: FeedWidth (0.36->0.40)
+#   This script loads the original model's default Groups, then patches in
+#   the corrected values from our revised data-raw/GroupInputs.csv. This
+#   ensures the original model code runs with the correct biological parameters.
 #
 # Prerequisites:
 #   - Install the original zoomss package (uncomment the line below):
@@ -76,8 +82,15 @@ if (length(patched_cols) == 0) {
   cat("  Patched", length(patched_cols), "column(s):", paste(patched_cols, collapse = ", "), "\n")
 }
 
-cat("\nCorrected Carbon values:\n")
-print(data.frame(Species = Groups$Species, Carbon = Groups$Carbon))
+cat("\nCorrected key values:\n")
+print(data.frame(
+  Species  = Groups$Species,
+  Carbon   = Groups$Carbon,
+  W0       = Groups$W0,
+  Wmax     = Groups$Wmax,
+  FeedWidth = Groups$FeedWidth,
+  Fmort_Wmax = Groups$Fmort_Wmax
+))
 
 zoo_idx <- which(Groups$Type == "Zooplankton")
 fish_idx <- which(Groups$Type == "Fish")

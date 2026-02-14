@@ -59,13 +59,21 @@ spawning stock biomass (SSB), egg production, and density-independent recruitmen
 >   the required outputs.
 
 > **Data correction:** The original ZooMSS package (`MathMarEcol/zoomss`) ships
-> with incorrect Carbon values and other parameter errors in its built-in
-> `GroupInputs.rda`. When generating the baseline (Section 7 / `calibration/
-> 01_generate_baseline.R`), the original model's default Groups are loaded for
-> structural compatibility (retaining `GrossGEscale`, `Repro`, etc.), then shared
-> columns are patched with the corrected values from `data-raw/GroupInputs.csv`.
-> This ensures biological parameters such as Carbon content are consistent across
-> both the original and revised model comparisons.
+> with several parameter errors in its built-in `GroupInputs.rda`:
+>
+> - **Carbon content**: Flagellates (0.14→0.15), Larvaceans (0.01→0.02),
+>   OmniCopepods (0.10→0.12), CarnCopepods (0.10→0.12), Euphausiids
+>   (0.11→0.12), Salps (0.01→0.02)
+> - **Fish_Large maximum size**: `Wmax` (7→6) and `Fmort_Wmax` (7→6)
+> - **Flagellates minimum size**: `W0` (−12→−10.7)
+> - **CarnCopepods feeding kernel width**: `FeedWidth` (0.36→0.40)
+>
+> When generating the baseline (Section 7 / `calibration/01_generate_baseline.R`),
+> the original model's default Groups are loaded for structural compatibility
+> (retaining `GrossGEscale`, `Repro`, etc.), then shared columns are patched with
+> the corrected values from `data-raw/GroupInputs.csv`. This ensures all
+> biological parameters are consistent across both the original and revised model
+> comparisons.
 
 ## 2. Parameter Mapping Table
 
