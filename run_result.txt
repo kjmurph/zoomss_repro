@@ -1,0 +1,4 @@
+RUN_OK
+N_finite: TRUE
+N_nonneg: TRUE
+gg_total_saved: TRUE
