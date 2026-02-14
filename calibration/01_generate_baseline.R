@@ -113,7 +113,7 @@ results <- future_lapply(chl_levels, function(chl) {
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
   # Extract time-averaged abundance over final avg_years
-  avg_N <- averageTimeSeries(mdl, var = "N", n_years = avg_years)
+  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = avg_years)
   # avg_N is a 2D matrix: groups x size_classes
 
 

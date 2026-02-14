@@ -19,11 +19,15 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(zoomss)
+suppressMessages(devtools::load_all("."))
 library(ggplot2)
 library(patchwork)
 library(dplyr)
 library(tidyr)
+library(future.apply)
+
+# Parallelise across chlorophyll/SST levels
+plan(multisession, workers = min(parallelly::availableCores() - 1, 8))
 ```
 
 ## 1. Introduction
@@ -51,12 +55,10 @@ spawning stock biomass (SSB), egg production, and density-independent recruitmen
 3. Demonstrate new capabilities (fish dynamics, prey quality effects)
 4. Evaluate calibration results
 
-> **Note:** The long-running model simulations in this vignette are set to
-> `eval = FALSE` by default. To generate the results, either:
->
-> - Run the code chunks interactively in RStudio, or
-> - Run the calibration scripts in `calibration/` first, which pre-compute
->   the required outputs.
+> **Note:** Most simulation chunks in this vignette are set to `cache = TRUE`
+> so they only re-run when the code changes. Sections 4.1 (baseline comparison)
+> and 7 (calibrated comparison) remain `eval = FALSE` because they require
+> pre-computed outputs from the calibration pipeline.
 
 > **Data correction:** The original ZooMSS package (`MathMarEcol/zoomss`) ships
 > with several parameter errors in its built-in `GroupInputs.rda`:
@@ -151,7 +153,7 @@ defecation mechanism.
 effectively recovering the original model's behaviour for zooplankton while
 maintaining fish reproduction.
 
-```{r null-test, eval = FALSE}
+```{r null-test, cache = TRUE}
 # ── Scenario A (default): full energy budget with R_frac ──
 Groups_A <- getGroups()
 
@@ -169,8 +171,8 @@ mdl_B <- zoomss_model(input_params = env_null, Groups = Groups_A, isave = 10,
                        energy_budget_scenario = "B")
 
 # ── Extract steady-state biomass ──
-avg_N_A <- averageTimeSeries(mdl_A, var = "N", n_years = 100)
-avg_N_B <- averageTimeSeries(mdl_B, var = "N", n_years = 100)
+avg_N_A <- averageTimeSeries(mdl_A, var = "abundance", n_years = 100)
+avg_N_B <- averageTimeSeries(mdl_B, var = "abundance", n_years = 100)
 
 w <- mdl_A$param$w
 bm_A <- sweep(avg_N_A, 2, w, "*")
@@ -219,21 +221,20 @@ ggplot(null_spectra, aes(x = log10_size, y = log10_bm, colour = scenario)) +
 Compare community structure across a chlorophyll gradient (0.05–10 mg/m³) at
 constant temperature (15°C).
 
-```{r productivity-gradient, eval = FALSE}
+```{r productivity-gradient, cache = TRUE}
 chl_levels <- c(0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
 Groups <- getGroups()
 zoo_idx  <- which(Groups$Type == "Zooplankton")
 fish_idx <- which(Groups$Type == "Fish")
 
-# ── Run revised model across gradient ──
-# (If calibration baseline exists, load it for comparison)
-library(future.apply)
-plan(multisession, workers = parallelly::availableCores() - 1)
+# Colour palette from Groups$PlotColour (matches plotTimeSeries defaults)
+zoo_colors  <- setNames(Groups$PlotColour[zoo_idx],  Groups$Species[zoo_idx])
+fish_colors <- setNames(Groups$PlotColour[fish_idx], Groups$Species[fish_idx])
 
 revised_chl <- future_lapply(chl_levels, function(chl) {
   env <- createInputParams(time = seq(0, 400, by = 0.1), sst = 15, chl = chl)
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
-  avg_N <- averageTimeSeries(mdl, var = "N", n_years = 100)
+  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
   w <- mdl$param$w
   avg_bm <- sweep(avg_N, 2, w, "*")
   group_bm <- rowSums(avg_bm)
@@ -270,6 +271,7 @@ zoo_long <- as.data.frame(zoo_prop) %>%
 
 p_zoo_prop <- ggplot(zoo_long, aes(x = factor(chl), y = proportion, fill = species)) +
   geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = zoo_colors) +
   labs(
     title = "Zooplankton Community Composition (Revised Model)",
     x     = "Chlorophyll (mg/m³)",
@@ -356,14 +358,14 @@ if (file.exists(baseline_path)) {
 Compare community structure across a sea surface temperature gradient (5–25°C)
 at constant chlorophyll (1.0 mg/m³).
 
-```{r temperature-gradient, eval = FALSE}
+```{r temperature-gradient, cache = TRUE}
 sst_levels <- seq(5, 25, by = 5)
 chl_constant <- 1.0
 
 sst_results <- future_lapply(sst_levels, function(sst) {
   env <- createInputParams(time = seq(0, 400, by = 0.1), sst = sst, chl = chl_constant)
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
-  avg_N <- averageTimeSeries(mdl, var = "N", n_years = 100)
+  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
   w <- mdl$param$w
   avg_bm <- sweep(avg_N, 2, w, "*")
   group_bm <- rowSums(avg_bm)
@@ -394,6 +396,7 @@ sst_zoo_long <- as.data.frame(sst_zoo_prop) %>%
 
 p_sst_zoo <- ggplot(sst_zoo_long, aes(x = factor(sst), y = proportion, fill = species)) +
   geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = zoo_colors) +
   labs(
     title = "Zooplankton Composition Across Temperature Gradient",
     x     = "SST (°C)",
@@ -435,7 +438,7 @@ p_sst_zoo / (p_sst_ratio | p_sst_total)
 The revised model introduces explicit fish reproduction dynamics. This section
 examines spawning stock biomass (SSB), recruitment, and biomass stability.
 
-```{r fish-dynamics, eval = FALSE}
+```{r fish-dynamics, cache = TRUE}
 # Run a single 400-year simulation at chl = 1.0 and extract time series
 env_fish <- createInputParams(time = seq(0, 400, by = 0.1), sst = 15, chl = 1.0)
 mdl_fish <- zoomss_model(input_params = env_fish, Groups = Groups, isave = 10)
@@ -463,6 +466,7 @@ for (f in 1:num_fish) {
 
 p_ssb_ts <- ggplot(ssb_df, aes(x = time, y = ssb, colour = species)) +
   geom_line(linewidth = 0.5, alpha = 0.7) +
+  scale_colour_manual(values = fish_colors) +
   labs(
     title  = "Spawning Stock Biomass Over Time",
     x      = "Year",
@@ -473,6 +477,7 @@ p_ssb_ts <- ggplot(ssb_df, aes(x = time, y = ssb, colour = species)) +
 
 p_rec_ts <- ggplot(rec_df, aes(x = time, y = recruitment, colour = species)) +
   geom_line(linewidth = 0.5, alpha = 0.7) +
+  scale_colour_manual(values = fish_colors) +
   labs(
     title  = "Recruitment Over Time",
     x      = "Year",
@@ -488,6 +493,7 @@ sr_steady <- sr_df %>% filter(time >= 300)
 
 p_sr <- ggplot(sr_steady, aes(x = ssb, y = recruitment, colour = species)) +
   geom_point(alpha = 0.3, size = 0.5) +
+  scale_colour_manual(values = fish_colors) +
   labs(
     title  = "Stock-Recruitment Relationship (Final 100 Years)",
     x      = "SSB",
@@ -501,20 +507,19 @@ p_sr <- ggplot(sr_steady, aes(x = ssb, y = recruitment, colour = species)) +
 
 ### Fish dynamics across productivity gradient
 
-```{r fish-gradient, eval = FALSE}
+```{r fish-gradient, cache = TRUE}
 # Extract SSB and recruitment from the chl gradient runs (Section 4)
 chl_ssb <- data.frame()
 chl_rec <- data.frame()
 
 for (i in seq_along(chl_levels)) {
   mdl <- revised_chl[[i]]$mdl
-  nsave <- dim(mdl$SSB)[1]
-  dt_saved <- mdl$param$isave * mdl$param$dt
-  n_steps <- min(nsave, round(100 / dt_saved))
-  start_idx <- max(1, nsave - n_steps + 1)
+  time_vec <- mdl$time
+  start_time <- max(0, max(time_vec) - 100)
+  time_idx <- which(time_vec >= start_time)
 
-  avg_ssb <- colMeans(mdl$SSB[start_idx:nsave, , drop = FALSE])
-  avg_rec <- colMeans(mdl$recruitment[start_idx:nsave, , drop = FALSE])
+  avg_ssb <- colMeans(mdl$SSB[time_idx, , drop = FALSE])
+  avg_rec <- colMeans(mdl$recruitment[time_idx, , drop = FALSE])
 
   chl_ssb <- rbind(chl_ssb, data.frame(
     chl     = chl_levels[i],
@@ -532,6 +537,7 @@ p_chl_ssb <- ggplot(chl_ssb, aes(x = chl, y = ssb, colour = species)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
   scale_x_log10() +
+  scale_colour_manual(values = fish_colors) +
   labs(title = "SSB Across Productivity Gradient",
        x = "Chlorophyll (mg/m³)", y = "SSB", colour = "Species") +
   theme_minimal()
@@ -540,6 +546,7 @@ p_chl_rec <- ggplot(chl_rec, aes(x = chl, y = recruitment, colour = species)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
   scale_x_log10() +
+  scale_colour_manual(values = fish_colors) +
   labs(title = "Recruitment Across Productivity Gradient",
        x = "Chlorophyll (mg/m³)", y = "Recruitment", colour = "Species") +
   theme_minimal()
@@ -549,24 +556,19 @@ p_chl_ssb | p_chl_rec
 
 ### Biomass stability
 
-```{r biomass-stability, eval = FALSE}
+```{r biomass-stability, cache = TRUE}
 # Coefficient of variation of total biomass over final 100 years
 cv_df <- data.frame()
 
 for (i in seq_along(chl_levels)) {
   mdl <- revised_chl[[i]]$mdl
-  nsave <- dim(mdl$N)[1]
-  dt_saved <- mdl$param$isave * mdl$param$dt
-  n_steps <- min(nsave, round(100 / dt_saved))
-  start_idx <- max(1, nsave - n_steps + 1)
-  w <- mdl$param$w
+  Biomass <- getBiomass(mdl, units = "ww")        # time x group x size
+  time_vec <- mdl$time
+  start_time <- max(0, max(time_vec) - 100)
+  time_idx <- which(time_vec >= start_time)
 
   # Total biomass at each saved time step
-  total_bm_ts <- numeric(nsave - start_idx + 1)
-  for (t in start_idx:nsave) {
-    bm <- sum(mdl$N[t, , ] * rep(w, each = dim(mdl$N)[2]))
-    total_bm_ts[t - start_idx + 1] <- bm
-  }
+  total_bm_ts <- apply(Biomass[time_idx, , , drop = FALSE], 1, sum)
 
   cv <- sd(total_bm_ts) / mean(total_bm_ts)
 
@@ -639,7 +641,7 @@ if (file.exists(cal_path)) {
   cal_chl <- future_lapply(chl_levels, function(chl) {
     env <- createInputParams(time = seq(0, 400, by = 0.1), sst = 15, chl = chl)
     mdl <- zoomss_model(input_params = env, Groups = Groups_cal, isave = 10)
-    avg_N <- averageTimeSeries(mdl, var = "N", n_years = 100)
+    avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
     w <- mdl$param$w
     avg_bm <- sweep(avg_N, 2, w, "*")
     group_bm <- rowSums(avg_bm)
@@ -676,6 +678,7 @@ if (file.exists(cal_path)) {
 
   ggplot(zoo_compare, aes(x = factor(chl), y = prop, fill = species)) +
     geom_bar(stat = "identity", position = "stack") +
+    scale_fill_manual(values = zoo_colors) +
     facet_wrap(~model) +
     labs(
       title = "Zooplankton Proportions: Original vs Calibrated Revised Model",

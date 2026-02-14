@@ -237,7 +237,9 @@ extractSizeRange = function(mdl, var, min_size, max_size) {
 #'   and other model outputs after the model has reached dynamic equilibrium.
 #'
 #' @param mdl ZooMSS model results object containing model parameters and output arrays
-#' @param var Character string specifying which variable to extract and average (e.g., "N", "Growth", "Mort")
+#' @param var Character string specifying which 3D variable to extract and average
+#'   (e.g., "abundance", "mortality", "growth", "biomass"). Must match a 3D array
+#'   in the model output.
 #' @param n_years Number of years from the end of the time series to average (default: 10)
 #'
 #' @return 2D array with averaged values (groups x size_classes)
@@ -249,10 +251,10 @@ extractSizeRange = function(mdl, var, min_size, max_size) {
 #' results <- zoomss_model(input_params, Groups)
 #'
 #' # Average final 3 years of abundance data
-#' avg_abundance <- averageTimeSeries(results, "N", n_years = 3)
+#' avg_abundance <- averageTimeSeries(results, "abundance", n_years = 3)
 #'
 #' # Average final 10 years of growth data (default)
-#' avg_growth <- averageTimeSeries(results, "gg")
+#' avg_growth <- averageTimeSeries(results, "growth")
 #' }
 #'
 averageTimeSeries = function(mdl, var, n_years = 10){
@@ -271,8 +273,10 @@ averageTimeSeries = function(mdl, var, n_years = 10){
 
   # Extract the specified variable from model output
   if (!var %in% names(mdl)) {
-    stop("Variable '", var, "' not found in model output. Available variables: ",
-         "N", "Z", "gg")
+    # List 3D array variables that can be averaged
+    array_vars <- names(mdl)[sapply(names(mdl), function(v) is.array(mdl[[v]]) && length(dim(mdl[[v]])) == 3)]
+    stop("Variable '", var, "' not found in model output. Available 3D variables: ",
+         paste(array_vars, collapse = ", "))
   }
   x <- mdl[[var]]
 

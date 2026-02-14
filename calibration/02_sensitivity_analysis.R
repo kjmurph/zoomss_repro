@@ -80,7 +80,7 @@ run_gradient <- function(Groups, chl_levels, sim_years = 400, avg_years = 100) {
       mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
       # Average abundance over final avg_years, compute biomass
-      avg_N <- averageTimeSeries(mdl, var = "N", n_years = avg_years)
+      avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = avg_years)
       w <- mdl$param$w
       avg_biomass <- sweep(avg_N, 2, w, "*")
       group_biomass <- rowSums(avg_biomass)

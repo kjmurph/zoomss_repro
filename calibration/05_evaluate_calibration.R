@@ -93,7 +93,7 @@ revised_results <- future_lapply(chl_levels, function(chl) {
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
   # Extract steady-state diagnostics
-  avg_N <- averageTimeSeries(mdl, var = "N", n_years = 100)
+  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
   w <- mdl$param$w
   avg_biomass <- sweep(avg_N, 2, w, "*")
   group_biomass <- rowSums(avg_biomass)
@@ -214,7 +214,7 @@ for (i in chl_plot_idx) {
   mdl <- revised_results[[i]]$mdl
   w   <- mdl$param$w
 
-  avg_N <- averageTimeSeries(mdl, var = "N", n_years = 100)
+  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
   # Sum across groups for community spectrum
   community_N <- colSums(avg_N)
   community_bm <- community_N * w
