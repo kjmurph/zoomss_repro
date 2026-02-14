@@ -22,7 +22,7 @@
 #'   \item{FeedWidth}{Numeric. Feeding kernel width parameter}
 #'   \item{Carbon}{Numeric. Carbon content (g C / g wet weight) of the group when consumed as prey}
 #'   \item{def_high}{Numeric. Defecation fraction for high-quality (high Carbon) prey (typically 0.30)}
-#'   \item{def_low}{Numeric. Defecation fraction for low-quality (low Carbon) prey (typically 0.50)}
+#'   \item{def_low}{Numeric. Defecation fraction for low-quality (low Carbon) prey (typically 0.95, reflecting high water content of gelatinous prey)}
 #'   \item{f_M}{Numeric. Metabolic fraction of assimilated energy (typically 0.50)}
 #'   \item{K_growth}{Numeric. Growth fraction of assimilated energy (group-specific, 0.25--0.50)}
 #'   \item{repro_eff}{Numeric. Reproductive efficiency - egg-to-recruit survival fraction (fish only)}

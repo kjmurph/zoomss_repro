@@ -1,6 +1,6 @@
 Species,Type,FeedType,Prop,W0,Wmax,Wmat,SearchCoef,SearchExp,PPMRscale,PPMR,FeedWidth,Carbon,def_high,def_low,f_M,K_growth,repro_eff,repro_on,mat_ogive_slope,Fmort,Fmort_W0,Fmort_Wmax,PlotColour
-Flagellates,Zooplankton,Heterotroph,0.1,-10.7,-6.8,-8.8,640,0.8,1.5,NA,0.36,0.15,0.30,0.95,0.45,0.40,0,0,10,0,-8.8,-6.8,seagreen3
-Ciliates,Zooplankton,Heterotroph,0.1,-9.3,-6.3,-8.3,640,0.8,0.04,NA,0.47,0.15,0.30,0.95,0.45,0.40,0,0,10,0,-8.3,-6.3,seagreen4
+Flagellates,Zooplankton,Heterotroph,0.1,-10.7,-6.8,-8.8,640,0.8,1.5,NA,0.36,0.15,0.30,0.95,0.45,0.55,0,0,10,0,-8.8,-6.8,seagreen3
+Ciliates,Zooplankton,Heterotroph,0.1,-9.3,-6.3,-8.3,640,0.8,0.04,NA,0.47,0.15,0.30,0.95,0.45,0.55,0,0,10,0,-8.3,-6.3,seagreen4
 Larvaceans,Zooplankton,FilterFeeder,0.1,-6.4,-3.2,-5.2,640,0.8,-3,NA,0.7,0.02,0.30,0.95,0.40,0.45,0,0,10,0,-5.2,-3.2,lightgoldenrod4
 OmniCopepods,Zooplankton,Omnivore,0.04,-7.5,-3.5,-5.5,640,0.8,-0.5,NA,0.57,0.12,0.30,0.95,0.50,0.30,0,0,10,0,-5.5,-3.5,cornflowerblue
 CarnCopepods,Zooplankton,Carnivore,0.06,-7.5,-2.5,-4.5,640,0.8,1.5,NA,0.40,0.12,0.30,0.95,0.50,0.30,0,0,10,0,-4.5,-2.5,darkred

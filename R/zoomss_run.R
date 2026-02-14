@@ -231,8 +231,8 @@ zoomss_run <- function(model){
     # REPRODUCTION CALCULATION (Fish only)
     # ==========================================================================
     # For fish with repro_on = 1:
-    # - Immature individuals (mat_ogive ~ 0): R_frac energy goes to growth
     # - Mature individuals (mat_ogive ~ 1): R_frac energy goes to reproduction
+    # - repro_rate feeds into SSB-based recruitment
 
     repro_rate <- matrix(0, nrow = ngrps, ncol = ngrid)
 
@@ -241,11 +241,21 @@ zoomss_run <- function(model){
       if (repro_on[fg] == 1 && R_frac[fg] > 0) {
         # Reproductive rate: R_frac portion of assimilated energy, scaled by maturity
         repro_rate[fg, ] <- R_frac[fg] * gg_total[fg, ] * mat_ogive[fg, ]
+      }
+    }
 
-        # For immature individuals, R_frac energy goes to growth instead
-        # gg_adjusted = K_growth * gg_total + R_frac * gg_total * (1 - mat_ogive)
-        gg[fg, ] <- K_growth[fg] * gg_total[fg, ] +
-                    R_frac[fg] * gg_total[fg, ] * (1 - mat_ogive[fg, ])
+    # ==========================================================================
+    # MATURITY-DEPENDENT GROWTH ADJUSTMENT (all groups with R_frac > 0)
+    # ==========================================================================
+    # Below maturation size (mat_ogive ~ 0): R_frac energy redirected to somatic growth
+    # Above maturation size (mat_ogive ~ 1): R_frac energy lost from system (zooplankton)
+    #   or allocated to reproduction (fish, via repro_rate above)
+    # gg_adjusted = K_growth * gg_total + R_frac * gg_total * (1 - mat_ogive)
+
+    for (g in 1:ngrps) {
+      if (R_frac[g] > 0) {
+        gg[g, ] <- K_growth[g] * gg_total[g, ] +
+                   R_frac[g] * gg_total[g, ] * (1 - mat_ogive[g, ])
       }
     }
 
@@ -285,9 +295,28 @@ zoomss_run <- function(model){
 
     diff <- current_diff_phyto + diff_dynam
 
-    # Partition diffusion by K_growth^2 for consistency with growth partitioning
-    # (diffusion scales as growth^2 in the MvF-D framework)
-    diff <- sweep(diff, 1, K_growth^2, '*')
+    # ==========================================================================
+    # DIFFUSION PARTITIONING
+    # ==========================================================================
+    # Diffusion scales as growth^2 in the MvF-D framework.
+    # For groups with R_frac > 0, the effective growth fraction is size-dependent:
+    #   eff_K = K_growth + R_frac * (1 - mat_ogive)
+    # (immature individuals redirect R_frac to growth, so eff_K > K_growth)
+    # Diffusion must use eff_K^2 to remain consistent with the actual growth rate.
+
+    # Start with K_growth^2 for all groups (correct for groups with R_frac = 0)
+    eff_K_sq <- matrix(rep(K_growth^2, each = ngrid), nrow = ngrps, ncol = ngrid, byrow = TRUE)
+
+    # Adjust for all groups with R_frac > 0: use size-dependent effective growth fraction
+    for (g in 1:ngrps) {
+      if (R_frac[g] > 0) {
+        eff_K <- K_growth[g] + R_frac[g] * (1 - mat_ogive[g, ])
+        eff_K_sq[g, ] <- eff_K^2
+      }
+    }
+
+    # Apply size-dependent diffusion scaling
+    diff <- diff * eff_K_sq
 
     # ==========================================================================
     # McKendrick-von Foerster NUMERICAL SOLUTION

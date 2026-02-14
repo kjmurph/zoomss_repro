@@ -23,6 +23,8 @@
 #'   If NULL, uses default ZooMSS functional groups. Can be obtained/customized using
 #'   getGroups().
 #' @param isave Save frequency in time steps (default: 10)
+#' @param energy_budget_scenario Character. Energy budget scenario: "A" (default, full energy
+#'   budget with zooplankton R_frac > 0) or "B" (zooplankton R_frac redistributed to K_growth).
 #'
 #' @return Complete ZooMSS model results object containing:
 #'   \itemize{
@@ -59,7 +61,7 @@
 #' results <- zoomss_model(input_params, custom_groups)
 #' }
 #'
-zoomss_model <- function(input_params, Groups = NULL, isave = 1){
+zoomss_model <- function(input_params, Groups = NULL, isave = 1, energy_budget_scenario = "A"){
 
   # Handle default Groups parameter
   if (is.null(Groups)) {
@@ -79,7 +81,7 @@ zoomss_model <- function(input_params, Groups = NULL, isave = 1){
   }
 
   ################### RUN THE MODEL ###################
-  param <- zoomss_params(Groups, input_params, isave) # Set up parameter list
+  param <- zoomss_params(Groups, input_params, isave, energy_budget_scenario) # Set up parameter list
   model <- zoomss_setup(param) # Set up model equation stuff
   model_output <- zoomss_run(model) # Run the model
 

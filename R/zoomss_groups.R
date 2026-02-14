@@ -267,6 +267,13 @@ validateGroups <- function(groups) {
   assertthat::assert_that(all(groups$repro_on %in% c(0, 1)),
                          msg = "repro_on must be 0 or 1")
 
+  # Check that fish with reproduction enabled have positive reproductive efficiency
+  fish_repro_on <- groups$repro_on == 1
+  if (any(fish_repro_on)) {
+    assertthat::assert_that(all(groups$repro_eff[fish_repro_on] > 0),
+                           msg = "repro_eff must be > 0 for groups with repro_on = 1 (otherwise recruitment will be zero)")
+  }
+
   # Check that repro_on is only enabled for fish (zooplankton must have repro_on = 0)
   zoo_mask <- groups$Type == "Zooplankton"
   assertthat::assert_that(all(groups$repro_on[zoo_mask] == 0),

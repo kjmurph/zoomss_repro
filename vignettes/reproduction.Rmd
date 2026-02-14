@@ -75,8 +75,8 @@ print(energy_params)
 
 Notice that:
 - **Energy budget fractions are group-specific**: `f_M`, `K_growth`, and `R_frac = 1 - f_M - K_growth` vary across functional groups
-- `K_growth` ranges from 0.25 (Euphausiids) to 0.50 (Jellyfish), reflecting different life-history strategies
-- **Zooplankton** have `repro_on = 0` (all production goes to somatic growth)
+- `K_growth` ranges from 0.25 (Euphausiids) to 0.55 (Flagellates, Ciliates), reflecting different life-history strategies
+- **Zooplankton** have `repro_on = 0` (reproduction is not explicitly modelled). Most zooplankton groups have `R_frac > 0` (0.15–0.20), representing real reproductive costs. Below maturation size, R_frac energy is redirected to somatic growth; above maturation size, it is lost from the modelled system. Zooplankton recruitment is instead maintained via boundary conditions. Flagellates and Ciliates have `R_frac = 0` because they reproduce by binary fission rather than allocating a separable fraction of production to offspring.
 - **Fish** have `repro_on = 1` (reproduction enabled), with `R_frac = 1 - f_M - K_growth` allocated to reproduction
 - `def_low = 0.95` across all groups — gelatinous prey (jellyfish, salps) incur very high non-nutritive fractions
 
@@ -117,7 +117,17 @@ This plot shows how assimilated energy is partitioned into metabolism, growth, a
 plotEnergyBudget(mdl_constant)
 ```
 
-Note that energy budget fractions are group-specific. For fish, the allocation depends on maturity: **immature fish** allocate all production to growth (K_growth + R_frac), while **mature fish** split production between growth (K_growth) and reproduction (R_frac). The transition is governed by a size-based maturity ogive.
+Note that energy budget fractions are group-specific. For all groups with R_frac > 0, the allocation depends on maturity: **immature individuals** (below Wmat) redirect R_frac to somatic growth (effective growth = K_growth + R_frac), while **mature individuals** allocate R_frac either to explicit reproduction (fish) or lose it from the system (zooplankton). The transition is governed by a size-based maturity ogive.
+
+#### Energy Budget Scenarios
+
+The model supports two energy budget scenarios, controlled by `energy_budget_scenario` in `zoomss_params()`:
+
+- **Scenario A (default):** Full energy budget for all groups. Most zooplankton groups have `R_frac > 0` (0.15–0.20), representing reproductive energy that is redirected to growth below maturation size and lost above maturation size. Flagellates and Ciliates have `R_frac = 0` (binary fission). This is biologically realistic but means not all assimilated energy contributes to modelled growth for mature zooplankton.
+
+- **Scenario B:** Zooplankton `R_frac` is redistributed to `K_growth` (i.e., `R_frac = 0` for all zooplankton). Fish groups are unaffected. This preserves more energy in the modelled system and may simplify calibration against observed biomass patterns.
+
+The choice of scenario affects zooplankton biomass levels and should be documented when reporting model results.
 
 #### Defecation by Prey Quality
 
@@ -137,7 +147,7 @@ This heatmap shows the net growth efficiency for each predator-prey combination:
 plotAssimilationMatrix(mdl_constant)
 ```
 
-This matrix displays the growth efficiency for each predator-prey combination, calculated as $(1 - D_{prey}) \times K_{predator}$. Prey are ordered by Carbon content along the x-axis (low Carbon like Larvaceans and Salps on the left, high Carbon like Ciliates/Flagellates on the right). Higher values (brighter colours) indicate that a predator gains more somatic growth per unit prey consumed. Growth efficiency varies across groups because K_growth is group-specific (0.25–0.50).
+This matrix displays the growth efficiency for each predator-prey combination, calculated as $(1 - D_{prey}) \times K_{predator}$. Prey are ordered by Carbon content along the x-axis (low Carbon like Larvaceans and Salps on the left, high Carbon like Ciliates/Flagellates on the right). Higher values (brighter colours) indicate that a predator gains more somatic growth per unit prey consumed. Growth efficiency varies across groups because K_growth is group-specific (0.25–0.55).
 
 ### Biomass Dynamics
 
@@ -186,11 +196,11 @@ wrap_plots(p_ssb, p_recruit, p_repro, ncol = 1)
 Compare growth rates between fish and zooplankton:
 
 ```{r fig.height=6}
-# Growth rates for zooplankton (higher K_growth = 0.50)
+# Growth rates for zooplankton (K_growth ranges from 0.25 to 0.55 across groups)
 p_zoo <- plotGrowthComparison(mdl_constant, groups = "zooplankton") +
   ggtitle("Zooplankton Growth Rates")
 
-# Growth rates for fish (lower K_growth = 0.36, with reproduction)
+# Growth rates for fish (K_growth = 0.30, with R_frac allocated to reproduction for mature individuals)
 p_fish <- plotGrowthComparison(mdl_constant, groups = "fish") +
   ggtitle("Fish Growth Rates")
 
@@ -792,13 +802,13 @@ wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
 
 This vignette demonstrated the explicit energy budget and fish reproduction system in ZooMSS:
 
-1. **Energy Budget Components**: The model explicitly tracks non-nutritive fraction (defecation + water/structural losses), metabolism, growth, and reproduction fractions. Energy budget parameters (`f_M`, `K_growth`, `R_frac`) are group-specific, ranging from K_growth = 0.25 (Euphausiids) to 0.50 (Jellyfish).
+1. **Energy Budget Components**: The model explicitly tracks non-nutritive fraction (defecation + water/structural losses), metabolism, growth, and reproduction fractions. Energy budget parameters (`f_M`, `K_growth`, `R_frac`) are group-specific, with K_growth ranging from 0.25 (Euphausiids) to 0.55 (Flagellates, Ciliates). For zooplankton with R_frac > 0, immature individuals redirect R_frac to growth while mature individuals lose it from the system; for fish, R_frac drives explicit SSB-based recruitment. Flagellates and Ciliates have R_frac = 0 (binary fission).
 
 2. **Prey Quality Effects**: The non-nutritive fraction varies continuously with prey Carbon content from `def_high = 0.30` (high-Carbon prey like ciliates/flagellates at 0.15 g C/g WW) to `def_low = 0.95` (low-Carbon prey like jellyfish at 0.005 g C/g WW). This ~12× dynamic range in growth efficiency across prey types captures the fundamental difference between carbon-dense and gelatinous prey.
 
 3. **Food Web Structure**: Emergent PPMR distributions and trophic levels provide diagnostic checks on the model's food web. Trophic levels range from ~2 for herbivores/omnivores to >3 for top predators.
 
-4. **Fish Reproduction**: Fish groups allocate a group-specific fraction of assimilated energy (R_frac) to reproduction, scaled by a maturity ogive. Immature fish redirect R_frac to somatic growth.
+4. **Fish Reproduction**: Fish groups allocate a group-specific fraction of assimilated energy (R_frac) to reproduction, scaled by a maturity ogive. Immature fish and zooplankton redirect R_frac to somatic growth.
 
 5. **Recruitment**: New fish enter the population through explicit recruitment based on Spawning Stock Biomass (SSB).
 
@@ -811,10 +821,12 @@ This vignette demonstrated the explicit energy budget and fish reproduction syst
 
 | Aspect | Zooplankton | Fish |
 |--------|-------------|------|
-| K_growth | 0.25–0.50 (group-specific) | 0.30 (all fish groups) |
-| R_frac | 0.00 (not used) | 0.20 (= 1 - f_M - K_growth) |
-| repro_on | 0 (disabled) | 1 (enabled) |
-| Recruitment | Boundary condition | SSB-driven |
+| K_growth | 0.25–0.55 (group-specific) | 0.30 (all fish groups) |
+| R_frac | 0.00–0.20 (group-specific; 0.00 for Flagellates/Ciliates, 0.15–0.20 for others) | 0.20 (= 1 - f_M - K_growth; drives explicit reproduction) |
+| repro_on | 0 (no explicit reproduction) | 1 (enabled) |
+| Recruitment | Boundary condition (independent of energetics) | SSB-driven via R_frac and maturity ogive |
+
+**Note on zooplankton R_frac:** Most zooplankton groups have R_frac > 0 (0.15–0.20), representing real energy allocated to reproduction. Below maturation size, this energy is redirected to somatic growth; above maturation size, it is lost from the modelled population (zooplankton recruitment uses boundary conditions that do not respond to reproductive investment). Flagellates and Ciliates have R_frac = 0 because they reproduce by binary fission. The energy budget framework supports future implementation of explicit zooplankton reproduction.
 
 The explicit energy budget provides a mechanistic foundation for understanding how environmental change affects fish population dynamics through reproduction.
 

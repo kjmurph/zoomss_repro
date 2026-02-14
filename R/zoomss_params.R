@@ -55,7 +55,7 @@
 #'
 #' @noRd
 #'
-zoomss_params <- function(Groups, input_params, isave){
+zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = "A"){
 
   # Calculate dt and tmax from time column in input_params
   time_values <- input_params$time
@@ -188,7 +188,8 @@ zoomss_params <- function(Groups, input_params, isave){
   # "B" = R_frac = 0 for zooplankton (redistributed to K_growth)
   #       Fish groups retain their R_frac values unchanged
 
-  energy_budget_scenario <- "A"  # Toggle: "A" or "B"
+  # Validate energy budget scenario
+  energy_budget_scenario <- match.arg(energy_budget_scenario, choices = c("A", "B"))
 
   if (energy_budget_scenario == "B") {
     zoo_idx <- param$zoo_grps
