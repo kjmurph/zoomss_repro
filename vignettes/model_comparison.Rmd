@@ -1,5 +1,10 @@
 ---
 title: "Model Comparison: Original vs Revised ZooMSS"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
 vignette: >
   %\VignetteIndexEntry{Model Comparison}
   %\VignetteEngine{knitr::rmarkdown}
@@ -143,6 +148,77 @@ knitr::kable(budget_table, digits = 3,
 ```
 
 
+## 2.1. Baseline Model Outputs
+
+Before comparing models, let's visualize the revised model's baseline behaviour
+using the default energy budget parameters. We'll run a 400-year simulation at
+constant conditions (SST = 15°C, chl = 1.0 mg/m³) to examine the energy budget
+structure and model dynamics.
+
+```{r baseline-run, cache = TRUE}
+# Run baseline model
+env_baseline <- createInputParams(
+  time = seq(0, 400, by = 0.1),
+  sst = 15,
+  chl = 1.0
+)
+
+mdl_baseline <- zoomss_model(
+  input_params = env_baseline,
+  Groups = Groups,
+  isave = 10
+)
+```
+
+### Energy Budget Allocation
+
+This plot shows how assimilated energy is partitioned into metabolism, growth,
+and reproduction for each functional group:
+
+```{r baseline-energy-budget, fig.height=5}
+plotEnergyBudget(mdl_baseline)
+```
+
+Note that:
+
+- **Zooplankton** allocate all production energy to growth (K_growth varies by
+  group, typically 0.41–0.55)
+- **Fish** split production between growth (K_growth = 0.30) and reproduction
+  (R_frac = 0.20)
+- For fish, immature individuals redirect R_frac back to growth via the maturity
+  ogive
+- All groups allocate f_M = 0.50 to metabolism
+
+### Defecation by Prey Quality
+
+This plot shows how defecation rate varies continuously with prey Carbon content:
+
+```{r baseline-defecation, fig.height=5}
+plotDefecation(mdl_baseline)
+```
+
+The defecation fraction decreases linearly with increasing prey Carbon content:
+
+- **High-Carbon prey** (e.g., Ciliates at 0.15 g C/g WW): low defecation (~30%),
+  more energy retained
+- **Low-Carbon prey** (e.g., Salps at 0.02 g C/g WW): high defecation (~95%),
+  less energy retained
+
+This prey-quality-dependent mechanism creates differential trophic efficiency that
+was absent in the original model's fixed GGE.
+
+### Baseline Biomass Dynamics
+
+```{r baseline-biomass, fig.height=6}
+plotTimeSeries(mdl_baseline, by = "biomass", transform = "log10") +
+  labs(title = "Baseline Biomass Dynamics (Revised Model)",
+       subtitle = "SST = 15°C, chl = 1.0 mg/m³")
+```
+
+The model reaches a stable oscillating steady state, with fish groups showing
+larger amplitude fluctuations due to explicit reproduction dynamics.
+
+
 ## 3. Null Test: Scenario B Approximates the Original
 
 When $R_\text{frac} = 0$ for zooplankton (Scenario B) and defecation is set to
@@ -227,6 +303,12 @@ ggplot(null_spectra, aes(x = log10_size, y = log10_bm, colour = scenario)) +
 
 Compare community structure across a chlorophyll gradient (0.05–10 mg/m³) at
 constant temperature (15°C).
+
+> **Model configuration:** This section uses the **revised model** with default
+> parameters from `getGroups()` and **energy budget scenario A** (full energy
+> budget with explicit fish reproduction). Each simulation runs for 400 years
+> with dt = 0.1 and isave = 10, averaging the final 100 years for steady-state
+> diagnostics.
 
 ```{r productivity-gradient, cache = TRUE}
 chl_levels <- c(0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
@@ -545,23 +627,7 @@ p_rec_ts <- ggplot(rec_df, aes(x = time, y = recruitment, colour = species)) +
   ) +
   theme_minimal()
 
-# ── SSB-Recruitment relationship ──
-sr_df <- merge(ssb_df, rec_df, by = c("time", "species"))
-# Use final 100 years only
-sr_steady <- sr_df %>% filter(time >= 300)
-
-p_sr <- ggplot(sr_steady, aes(x = ssb, y = recruitment, colour = species)) +
-  geom_point(alpha = 0.3, size = 0.5) +
-  scale_colour_manual(values = fish_colors) +
-  labs(
-    title  = "Stock-Recruitment Relationship (Final 100 Years)",
-    x      = "SSB",
-    y      = "Recruitment",
-    colour = "Species"
-  ) +
-  theme_minimal()
-
-(p_ssb_ts | p_rec_ts) / p_sr
+p_ssb_ts | p_rec_ts
 ```
 
 ### Fish dynamics across productivity gradient
