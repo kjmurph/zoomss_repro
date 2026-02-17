@@ -23,8 +23,9 @@ library(ggplot2)
 library(patchwork)
 library(future.apply)
 
-plan(multisession, workers = parallelly::availableCores() - 1)
-cat("Using", parallelly::availableCores() - 1, "parallel workers\n")
+n_workers <- min(8, parallelly::availableCores() - 1)
+plan(multisession, workers = n_workers)
+cat("Using", n_workers, "of", parallelly::availableCores(), "available cores\n")
 
 # ── Load baseline ──
 baseline <- readRDS("calibration/baseline_original_zoomss.rds")
@@ -41,7 +42,7 @@ sensitivity_params <- list(
     description = "Metabolic fraction of assimilated energy"
   ),
   K_growth_zoo_base = list(
-    default = 0.35,
+    default = 0.411,
     range = seq(0.15, 0.49, by = 0.05),
     description = "Zooplankton growth fraction (base, scaled per group)"
   ),
@@ -51,8 +52,8 @@ sensitivity_params <- list(
     description = "Fish growth fraction"
   ),
   repro_eff = list(
-    default = 0.002,
-    range = c(1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2),
+    default = 0.001,
+    range = c(0.001, 0.002, 0.003, 0.005, 0.007, 0.01),
     description = "Fish reproductive efficiency (egg-to-recruit survival)"
   ),
   def_low = list(
@@ -79,10 +80,11 @@ run_gradient <- function(Groups, chl_levels, sim_years = 400, avg_years = 100) {
       )
       mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
-      # Average abundance over final avg_years, compute biomass
-      avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = avg_years)
-      w <- mdl$param$w
-      avg_biomass <- sweep(avg_N, 2, w, "*")
+      # Compute biomass using getBiomass, then time-average
+      Biomass <- getBiomass(mdl, units = "ww")
+      time_vec <- mdl$time
+      time_idx <- which(time_vec >= max(time_vec) - avg_years)
+      avg_biomass <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
       group_biomass <- rowSums(avg_biomass)
 
       list(group_biomass = group_biomass, success = TRUE)
@@ -119,7 +121,7 @@ apply_perturbation <- function(Groups_default, param_name, value) {
 
   switch(param_name,
     f_M = {
-      Groups$f_M <- value
+      Groups$f_M[fish_idx] <- value
     },
     K_growth_zoo_base = {
       default_K_zoo <- Groups$K_growth[zoo_idx]
@@ -142,7 +144,9 @@ apply_perturbation <- function(Groups_default, param_name, value) {
 
   # Validate energy budget closure
   R_frac <- 1 - Groups$f_M - Groups$K_growth
-  if (any(R_frac < 0)) return(NULL)  # Invalid combination
+  if (any(R_frac < 0)) return(NULL)  # More energy allocated than available
+  # Fish need a minimum reproduction fraction to avoid model instability
+  if (any(R_frac[fish_idx] < 0.01)) return(NULL)
 
   Groups
 }
@@ -167,14 +171,23 @@ for (param_name in names(sensitivity_params)) {
       next
     }
 
-    tryCatch({
-      res <- run_gradient(Groups_mod, chl_levels)
-      res$param_value <- val
-      param_results <- c(param_results, list(res))
-      cat(" done\n")
-    }, error = function(e) {
-      cat(" ERROR:", e$message, "\n")
-    })
+    tryCatch(
+      withCallingHandlers({
+        res <- run_gradient(Groups_mod, chl_levels)
+        res$param_value <- val
+        param_results <- c(param_results, list(res))
+        cat(" done\n")
+      },
+      warning = function(w) {
+        if (grepl("FutureInterruptError|interrupt", w$message, ignore.case = TRUE)) {
+          cat(" WORKER CRASH (skipping)\n")
+          invokeRestart("muffleWarning")
+        }
+      }),
+      error = function(e) {
+        cat(" ERROR:", e$message, "\n")
+      }
+    )
   }
 
   sensitivity_results[[param_name]] <- param_results

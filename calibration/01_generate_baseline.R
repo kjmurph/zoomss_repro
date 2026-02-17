@@ -112,21 +112,20 @@ results <- future_lapply(chl_levels, function(chl) {
 
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
-  # Extract time-averaged abundance over final avg_years
-  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = avg_years)
-  # avg_N is a 2D matrix: groups x size_classes
+  # Compute wet-weight biomass using getBiomass (time x groups x size)
+  Biomass <- getBiomass(mdl, units = "ww")
 
+  # Time-average final avg_years using model time vector
+  time_vec <- mdl$time
+  start_time <- max(0, max(time_vec) - avg_years)
+  time_idx <- which(time_vec >= start_time)
 
-  # Compute biomass: abundance * weight at each size class
-  w <- mdl$param$w
-  avg_biomass <- sweep(avg_N, 2, w, "*")  # groups x size_classes
-
-  # Sum across sizes to get total biomass per group
+  # Average biomass over time, then sum over size for each group
+  avg_biomass <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
   group_biomass <- rowSums(avg_biomass)
 
   list(
     group_biomass = group_biomass,
-    avg_N         = avg_N,
     avg_biomass   = avg_biomass,
     chl           = chl
   )

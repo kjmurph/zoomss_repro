@@ -56,9 +56,10 @@ spawning stock biomass (SSB), egg production, and density-independent recruitmen
 4. Evaluate calibration results
 
 > **Note:** Most simulation chunks in this vignette are set to `cache = TRUE`
-> so they only re-run when the code changes. Sections 4.1 (baseline comparison)
-> and 7 (calibrated comparison) remain `eval = FALSE` because they require
-> pre-computed outputs from the calibration pipeline.
+> so they only re-run when the code changes. Section 4.1 (baseline comparison)
+> loads pre-computed outputs from `calibration/01_generate_baseline.R`.
+> Section 7 (calibrated comparison) remains `eval = FALSE` because it requires
+> outputs from the full calibration pipeline.
 
 > **Data correction:** The original ZooMSS package (`MathMarEcol/zoomss`) ships
 > with several parameter errors in its built-in `GroupInputs.rda`:
@@ -170,16 +171,22 @@ mdl_A <- zoomss_model(input_params = env_null, Groups = Groups_A, isave = 10,
 mdl_B <- zoomss_model(input_params = env_null, Groups = Groups_A, isave = 10,
                        energy_budget_scenario = "B")
 
-# ── Extract steady-state biomass ──
-avg_N_A <- averageTimeSeries(mdl_A, var = "abundance", n_years = 100)
-avg_N_B <- averageTimeSeries(mdl_B, var = "abundance", n_years = 100)
+# ── Extract steady-state biomass using getBiomass ──
+Biomass_A <- getBiomass(mdl_A, units = "ww")
+Biomass_B <- getBiomass(mdl_B, units = "ww")
 
-w <- mdl_A$param$w
-bm_A <- sweep(avg_N_A, 2, w, "*")
-bm_B <- sweep(avg_N_B, 2, w, "*")
+time_A <- mdl_A$time
+idx_A <- which(time_A >= max(time_A) - 100)
+time_B <- mdl_B$time
+idx_B <- which(time_B >= max(time_B) - 100)
+
+# Time-averaged biomass: groups x size
+bm_A <- apply(Biomass_A[idx_A, , , drop = FALSE], c(2, 3), mean)
+bm_B <- apply(Biomass_B[idx_B, , , drop = FALSE], c(2, 3), mean)
 
 group_bm_A <- rowSums(bm_A)
 group_bm_B <- rowSums(bm_B)
+w <- mdl_A$param$w
 
 null_test <- data.frame(
   Species    = Groups_A$Species,
@@ -234,9 +241,10 @@ fish_colors <- setNames(Groups$PlotColour[fish_idx], Groups$Species[fish_idx])
 revised_chl <- future_lapply(chl_levels, function(chl) {
   env <- createInputParams(time = seq(0, 400, by = 0.1), sst = 15, chl = chl)
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
-  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
-  w <- mdl$param$w
-  avg_bm <- sweep(avg_N, 2, w, "*")
+  Biomass <- getBiomass(mdl, units = "ww")
+  time_vec <- mdl$time
+  time_idx <- which(time_vec >= max(time_vec) - 100)
+  avg_bm <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
   group_bm <- rowSums(avg_bm)
   list(group_biomass = group_bm, mdl = mdl)
 }, future.seed = TRUE)
@@ -314,39 +322,89 @@ p_zoo_prop / (p_ratio | p_total)
 
 ### Side-by-side with baseline (if available)
 
-```{r baseline-comparison-chl, eval = FALSE}
+> **Note:** At chl \u2248 1.5\u20133.0 mg/m³, the original model produces anomalously
+> high Fish_Large biomass. The affected chl levels are excluded from the
+> comparison plots below. This warrants further investigation.
+
+```{r baseline-comparison-chl, cache = TRUE}
 baseline_path <- "calibration/baseline_original_zoomss.rds"
 
 if (file.exists(baseline_path)) {
   baseline <- readRDS(baseline_path)
 
-  # Zooplankton proportions comparison
+  # Identify and exclude unstable chl levels (Fish_Large blow-up)
+  fish_large_idx <- which(baseline$fish_species == "Fish_Large")
+  unstable <- baseline$fish_biomass[, fish_large_idx] > 1000
+  stable_mask <- !unstable
+
+  # Zooplankton proportions comparison (stable chl levels only)
+  stable_chl <- chl_levels[stable_mask]
+  n_stable <- length(stable_chl)
+
   zoo_compare <- rbind(
     data.frame(
-      chl     = rep(chl_levels, n_zoo),
-      species = rep(Groups$Species[zoo_idx], each = n_chl),
-      prop    = as.vector(baseline$zoo_proportions),
+      chl     = rep(stable_chl, n_zoo),
+      species = rep(Groups$Species[zoo_idx], each = n_stable),
+      prop    = as.vector(baseline$zoo_proportions[stable_mask, ]),
       model   = "Original"
     ),
     data.frame(
-      chl     = rep(chl_levels, n_zoo),
-      species = rep(Groups$Species[zoo_idx], each = n_chl),
-      prop    = as.vector(zoo_prop),
+      chl     = rep(stable_chl, n_zoo),
+      species = rep(Groups$Species[zoo_idx], each = n_stable),
+      prop    = as.vector(zoo_prop[stable_mask, ]),
       model   = "Revised"
     )
   )
 
-  ggplot(zoo_compare, aes(x = factor(chl), y = prop, fill = species)) +
+  p_compare_zoo <- ggplot(zoo_compare, aes(x = factor(chl), y = prop, fill = species)) +
     geom_bar(stat = "identity", position = "stack") +
+    scale_fill_manual(values = zoo_colors) +
     facet_wrap(~model) +
     labs(
       title = "Zooplankton Proportions: Original vs Revised",
+      subtitle = paste("Excluding unstable chl levels:", paste(chl_levels[unstable], collapse = ", ")),
       x     = "Chlorophyll (mg/m³)",
       y     = "Proportion",
       fill  = "Species"
     ) +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  # All-group biomass proportion comparison (stable levels)
+  all_colors <- setNames(Groups$PlotColour, Groups$Species)
+
+  bm_compare <- data.frame()
+  for (i in which(stable_mask)) {
+    gb_orig <- baseline$raw_results[[i]]$group_biomass
+    gb_rev  <- revised_chl[[i]]$group_biomass
+    bm_compare <- rbind(bm_compare,
+      data.frame(chl = chl_levels[i], species = Groups$Species,
+                 biomass = gb_orig, model = "Original"),
+      data.frame(chl = chl_levels[i], species = Groups$Species,
+                 biomass = gb_rev, model = "Revised")
+    )
+  }
+
+  bm_compare <- bm_compare %>%
+    group_by(chl, model) %>%
+    mutate(proportion = biomass / sum(biomass)) %>%
+    ungroup()
+  bm_compare$species <- factor(bm_compare$species, levels = Groups$Species)
+
+  p_compare_bm <- ggplot(bm_compare, aes(x = factor(chl), y = proportion, fill = species)) +
+    geom_bar(stat = "identity", position = "stack") +
+    scale_fill_manual(values = all_colors) +
+    facet_wrap(~model) +
+    labs(
+      title = "Biomass Proportions: Original vs Revised",
+      x     = "Chlorophyll (mg/m³)",
+      y     = "Biomass Proportion",
+      fill  = "Species"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  p_compare_zoo / p_compare_bm
 } else {
   cat("Baseline not found. Run calibration/01_generate_baseline.R first.\n")
 }
@@ -365,9 +423,10 @@ chl_constant <- 1.0
 sst_results <- future_lapply(sst_levels, function(sst) {
   env <- createInputParams(time = seq(0, 400, by = 0.1), sst = sst, chl = chl_constant)
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
-  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
-  w <- mdl$param$w
-  avg_bm <- sweep(avg_N, 2, w, "*")
+  Biomass <- getBiomass(mdl, units = "ww")
+  time_vec <- mdl$time
+  time_idx <- which(time_vec >= max(time_vec) - 100)
+  avg_bm <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
   group_bm <- rowSums(avg_bm)
   list(group_biomass = group_bm, mdl = mdl)
 }, future.seed = TRUE)
@@ -641,9 +700,10 @@ if (file.exists(cal_path)) {
   cal_chl <- future_lapply(chl_levels, function(chl) {
     env <- createInputParams(time = seq(0, 400, by = 0.1), sst = 15, chl = chl)
     mdl <- zoomss_model(input_params = env, Groups = Groups_cal, isave = 10)
-    avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
-    w <- mdl$param$w
-    avg_bm <- sweep(avg_N, 2, w, "*")
+    Biomass <- getBiomass(mdl, units = "ww")
+    time_vec <- mdl$time
+    time_idx <- which(time_vec >= max(time_vec) - 100)
+    avg_bm <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
     group_bm <- rowSums(avg_bm)
     list(group_biomass = group_bm)
   }, future.seed = TRUE)

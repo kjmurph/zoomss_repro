@@ -1,0 +1,863 @@
+﻿Rscript : Warning message:
+At line:1 char:89
++ ... mss_repro"; Rscript "calibration/02_sensitivity_analysis.R" 2>&1 | Ou ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Warning message::String) [], Remo 
+   teException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+package 'ggplot2' was built under R version 4.5.2 
+Warning message:
+package 'patchwork' was built under R version 4.5.2 
+Loading required package: future
+Using 15 parallel workers
+Using default ZooMSS functional groups. Use getGroups() to customize.
+
+=== Sensitivity analysis for: f_M ===
+    Metabolic fraction of assimilated energy 
+    Range: 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7 
+  Running f_M = 0.3 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.4 
+Functional groups validation passed
+ done
+  Running f_M = 0.35 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.35 
+Functional groups validation passed
+ done
+  Running f_M = 0.4 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.3 
+Functional groups validation passed
+ done
+  Running f_M = 0.45 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.25 
+Functional groups validation passed
+ done
+  Running f_M = 0.5 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+  Running f_M = 0.55 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+  Running f_M = 0.6 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.6 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+  Running f_M = 0.65 ...ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.05 to 0.05 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.2 to 0.2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+Functional groups validation passed
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 2 to 2 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 10 to 10 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.65 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+  Running f_M = 0.7 ... SKIPPED (invalid energy budget)
+
+=== Sensitivity analysis for: K_growth_zoo_base ===
+    Zooplankton growth fraction (base, scaled per group) 
+    Range: 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45 

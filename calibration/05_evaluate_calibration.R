@@ -92,10 +92,11 @@ revised_results <- future_lapply(chl_levels, function(chl) {
   )
   mdl <- zoomss_model(input_params = env, Groups = Groups, isave = 10)
 
-  # Extract steady-state diagnostics
-  avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
-  w <- mdl$param$w
-  avg_biomass <- sweep(avg_N, 2, w, "*")
+  # Extract steady-state diagnostics using getBiomass
+  Biomass <- getBiomass(mdl, units = "ww")
+  time_vec <- mdl$time
+  time_idx <- which(time_vec >= max(time_vec) - 100)
+  avg_biomass <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
   group_biomass <- rowSums(avg_biomass)
 
   # Fish reproduction metrics (final 100 years)

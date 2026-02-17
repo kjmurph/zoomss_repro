@@ -1,0 +1,113 @@
+﻿Rscript : Warning message:
+At line:1 char:89
++ ... omss_repro"; Rscript "calibration/02_sensitivity_test.R" 2>&1 | Out-F ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Warning message::String) [], Remo 
+   teException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+package 'ggplot2' was built under R version 4.5.2 
+Warning message:
+package 'patchwork' was built under R version 4.5.2 
+Loading required package: future
+Using 15 parallel workers
+Using default ZooMSS functional groups. Use getGroups() to customize.
+
+=== Test: f_M ===
+  Running f_M = 0.4 ...ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.4 0.4 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0.05 0.35 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.4 0.4 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0.05 0.35 
+Functional groups validation passed
+ done
+  Running f_M = 0.6 ... SKIPPED (invalid energy budget)
+
+=== Test: def_low ===
+  Running def_low = 0.7 ...ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+  Running def_low = 0.95 ...ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.5 to 0.5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ZooMSS input parameters created:
+- Time points: 1001 (time values provided)
+- Time steps: 1000 (intervals to simulate)
+- Time range: 0 to 100 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 5 to 5 mg/m^3
+Calculating phytoplankton parameters from environmental time series
+Energy budget loaded for 12 groups (Scenario A )
+  f_M range:       0.3 0.55 
+  K_growth range:   0.25 0.55 
+  R_frac range:     0 0.2 
+Functional groups validation passed
+ done
+
+=== RESULTS SUMMARY ===
+f_M : 1 successful runs
+  val = 0.4 | total_bm = 7.57, 72.46 | zoo_prop row1 = 0.021, 0.001, 0.006, 0.116, 0, 0.685, 0, 0.171, 0 
+def_low : 2 successful runs
+  val = 0.7 | total_bm = 16.38, 75.79 | zoo_prop row1 = 0.01, 0, 0.004, 0.051, 0, 0.532, 0, 0.403, 0 
+  val = 0.95 | total_bm = 6.43, 68.02 | zoo_prop row1 = 0.025, 0.001, 0.009, 0.131, 0, 0.58, 0, 0.254, 0 
+
+=== SENSITIVITY SUMMARY ===
+  parameter delta_zoo_prop delta_total_bm delta_zf_ratio
+1   def_low     0.02386236      0.2266304     0.09520512
+
+=== TEST PASSED ===

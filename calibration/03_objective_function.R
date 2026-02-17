@@ -76,10 +76,11 @@ calibration_objective <- function(par, baseline, chl_levels, Groups, verbose = F
         isave = 10  # coarser saving for speed during calibration
       )
 
-      # Extract steady-state biomass (average final 100 years)
-      avg_N <- averageTimeSeries(mdl, var = "abundance", n_years = 100)
-      w <- mdl$param$w
-      avg_biomass <- sweep(avg_N, 2, w, "*")
+      # Extract steady-state biomass using getBiomass (final 100 years)
+      Biomass <- getBiomass(mdl, units = "ww")
+      time_vec <- mdl$time
+      time_idx <- which(time_vec >= max(time_vec) - 100)
+      avg_biomass <- apply(Biomass[time_idx, , , drop = FALSE], c(2, 3), mean)
       group_biomass <- rowSums(avg_biomass)
 
       list(group_biomass = group_biomass, success = TRUE)

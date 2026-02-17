@@ -1,0 +1,40 @@
+﻿Rscript : Using default ZooMSS functional groups. Use getGroups() to customize.
+At line:1 char:89
++ ... GitHub\zoomss_repro"; Rscript scripts/diagnose_bracket.R 2>&1 | Out-F ...
++                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Using default Z...) to customize. 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+--- chl = 1.5 ---
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1.5 to 1.5 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Total: 220372 
+ Flagellates     Ciliates   Larvaceans OmniCopepods CarnCopepods  Euphausiids 
+      1.2105       0.0220       0.0006       0.2467       0.0290       0.0035 
+Chaetognaths        Salps    Jellyfish   Fish_Small     Fish_Med   Fish_Large 
+      0.0013       0.0002       0.0039       2.1647    1608.8443  218759.4957 
+
+--- chl = 3 ---
+ZooMSS input parameters created:
+- Time points: 4001 (time values provided)
+- Time steps: 4000 (intervals to simulate)
+- Time range: 0 to 400 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 3 to 3 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Total: 186614.8 
+ Flagellates     Ciliates   Larvaceans OmniCopepods CarnCopepods  Euphausiids 
+      1.2101       0.0168       0.0005       0.3419       0.0314       0.0046 
+Chaetognaths        Salps    Jellyfish   Fish_Small     Fish_Med   Fish_Large 
+      0.0015       0.0002       0.0038       1.6226    1588.8899  185022.6576 
+
