@@ -1,5 +1,14 @@
 ---
 title: "Getting started with ZooMSS"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    code_folding: hide
+    number_sections: false
 vignette: >
   %\VignetteIndexEntry{zoomss}
   %\VignetteEngine{knitr::rmarkdown}

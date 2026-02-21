@@ -9,7 +9,9 @@ averageTimeSeries(mdl, var, n_years = 10)
 \arguments{
 \item{mdl}{ZooMSS model results object containing model parameters and output arrays}
 
-\item{var}{Character string specifying which variable to extract and average (e.g., "N", "Growth", "Mort")}
+\item{var}{Character string specifying which 3D variable to extract and average
+(e.g., "abundance", "mortality", "growth", "biomass"). Must match a 3D array
+in the model output.}
 
 \item{n_years}{Number of years from the end of the time series to average (default: 10)}
 }
@@ -34,10 +36,10 @@ and other model outputs after the model has reached dynamic equilibrium.
 results <- zoomss_model(input_params, Groups)
 
 # Average final 3 years of abundance data
-avg_abundance <- averageTimeSeries(results, "N", n_years = 3)
+avg_abundance <- averageTimeSeries(results, "abundance", n_years = 3)
 
 # Average final 10 years of growth data (default)
-avg_growth <- averageTimeSeries(results, "gg")
+avg_growth <- averageTimeSeries(results, "growth")
 }
 
 }

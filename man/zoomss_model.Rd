@@ -4,7 +4,12 @@
 \alias{zoomss_model}
 \title{Main ZooMSS model function for complete simulations}
 \usage{
-zoomss_model(input_params, Groups = NULL, isave = 1)
+zoomss_model(
+  input_params,
+  Groups = NULL,
+  isave = 1,
+  energy_budget_scenario = "A"
+)
 }
 \arguments{
 \item{input_params}{Data frame containing model parameters and environmental time series.
@@ -18,6 +23,9 @@ If NULL, uses default ZooMSS functional groups. Can be obtained/customized using
 getGroups().}
 
 \item{isave}{Save frequency in time steps (default: 10)}
+
+\item{energy_budget_scenario}{Character. Energy budget scenario: "A" (default, full energy
+budget with zooplankton R_frac > 0) or "B" (zooplankton R_frac redistributed to K_growth).}
 }
 \value{
 Complete ZooMSS model results object containing:
@@ -32,6 +40,8 @@ Complete ZooMSS model results object containing:
 \item SSB: Spawning stock biomass time series (time x fish groups)
 \item recruitment: Recruitment flux time series (time x fish groups)
 \item total_repro_output: Total reproductive output time series (time x fish groups)
+\item catch: Predicted catch time series (time x fish groups, effort-driven mode only)
+\item Fmort_ts: Fishing mortality time series (time x groups x size, effort-driven mode only)
 \item biomass: Wet weight biomass by group and size
 \item biomassC: Carbon biomass by group and size
 \item Additional model structure and kernel data
