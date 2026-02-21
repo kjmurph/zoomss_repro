@@ -71,6 +71,15 @@ zoomss_run <- function(model){
   zoo_grps <- model$param$zoo_grps
   num_fish <- param$num_fish
 
+  # Extract effort-driven fishing parameters
+  effort_fishing <- param$effort_fishing
+  if (effort_fishing) {
+    effort <- param$effort          # ntime x num_fish matrix
+    q_fish <- param$q               # catchability per fish group (length num_fish)
+    selectivity <- model$selectivity # ngrps x ngrid matrix
+    fish_mort_dynamic <- matrix(0, nrow = ngrps, ncol = ngrid)  # working matrix
+  }
+
   # Extract energy budget parameters
   assim_by_prey <- model$assim_by_prey  # Pre-calculated: (1 - def) by predator-prey pair
   K_growth <- model$K_growth            # Growth fraction of assimilated
@@ -267,7 +276,21 @@ zoomss_run <- function(model){
     sw2 <- sweep(dynam_mortkernel, c(2,3), predation_multiplier, '*')
     ap2 <- aperm(sw2, c(2,3,1))
     M2 <- .colSums(colSums(ap2), ngrid, ngrid)
-    Z <- sweep(model$M_sb + model$fish_mort, 2, M2, '+')
+
+    # Fishing mortality: effort-driven (dynamic) or static (fallback)
+    if (effort_fishing) {
+      fish_mort_dynamic[] <- 0
+      for (f in 1:num_fish) {
+        fg <- fish_grps[f]
+        # F(w,t) = Effort(t) * q * Selectivity(w)
+        fish_mort_dynamic[fg, ] <- effort[itime, f] * q_fish[f] * selectivity[fg, ]
+      }
+      current_fish_mort <- fish_mort_dynamic
+    } else {
+      current_fish_mort <- model$fish_mort
+    }
+
+    Z <- sweep(model$M_sb + current_fish_mort, 2, M2, '+')
     rm(sw2, ap2)
 
     # ==========================================================================
@@ -442,6 +465,20 @@ zoomss_run <- function(model){
 
         # Recruitment
         model$recruitment[isav, f] <- (R_total * repro_eff[fg]) / (w[min_idx] * dx)
+      }
+
+      # Save effort-driven fishing outputs
+      if (effort_fishing) {
+        model$Fmort_ts[isav,,] <- current_fish_mort
+        for (f in 1:num_fish) {
+          fg <- fish_grps[f]
+          min_idx <- min_size_idx[fg]
+          max_idx <- max_size_idx[fg]
+          # Catch = integral of F(w) * N(w) * w dw over fished size range
+          model$catch[isav, f] <- sum(current_fish_mort[fg, min_idx:max_idx] *
+                                        N[fg, min_idx:max_idx] *
+                                        w[min_idx:max_idx]) * dx
+        }
       }
     }
   } # End of time loop

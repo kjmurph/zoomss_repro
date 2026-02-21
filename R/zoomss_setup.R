@@ -139,7 +139,19 @@ zoomss_setup <- function(param){
     repro_rate = array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)), # Reproductive investment rate
     SSB = array(NA, dim = c(param$nsave, param$num_fish)),  # Spawning Stock Biomass per fish group
     recruitment = array(NA, dim = c(param$nsave, param$num_fish)), # Recruitment flux per fish group
-    total_repro_output = array(NA, dim = c(param$nsave, param$num_fish)) # Total reproductive output per fish group
+    total_repro_output = array(NA, dim = c(param$nsave, param$num_fish)), # Total reproductive output per fish group
+
+    # ==========================================================================
+    # EFFORT-DRIVEN FISHING OUTPUT ARRAYS
+    # ==========================================================================
+    # These are populated only when effort time series are provided.
+    # catch: predicted catch biomass time series (nsave x num_fish) in g wet weight
+    # Fmort_ts: fishing mortality rate time series (nsave x ngrps x ngrid)
+    catch = if (param$effort_fishing) array(NA, dim = c(param$nsave, param$num_fish)) else NULL,
+    Fmort_ts = if (param$effort_fishing) array(NA, dim = c(param$nsave, param$ngrps, param$ngrid)) else NULL,
+
+    # Selectivity matrix (ngrps x ngrid): 1 within fished size range, 0 otherwise
+    selectivity = if (param$effort_fishing) param$selectivity else NULL
   )
 
   # Set phyto_theta for carnivores

@@ -286,6 +286,14 @@ validateGroups <- function(groups) {
   assertthat::assert_that(all(groups$Fmort >= 0),
                          msg = "Fmort (fishing mortality) must be non-negative")
 
+  # Check catchability coefficient (optional — required only when effort data is provided)
+  if ("q" %in% names(groups)) {
+    assertthat::assert_that(is.numeric(groups$q),
+                           msg = "q (catchability) must be numeric")
+    assertthat::assert_that(all(groups$q >= 0),
+                           msg = "q (catchability) must be non-negative")
+  }
+
   message("Functional groups validation passed")
   return(invisible(TRUE))
 }

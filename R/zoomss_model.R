@@ -38,6 +38,8 @@
 #'     \item SSB: Spawning stock biomass time series (time x fish groups)
 #'     \item recruitment: Recruitment flux time series (time x fish groups)
 #'     \item total_repro_output: Total reproductive output time series (time x fish groups)
+#'     \item catch: Predicted catch time series (time x fish groups, effort-driven mode only)
+#'     \item Fmort_ts: Fishing mortality time series (time x groups x size, effort-driven mode only)
 #'     \item biomass: Wet weight biomass by group and size
 #'     \item biomassC: Carbon biomass by group and size
 #'     \item Additional model structure and kernel data

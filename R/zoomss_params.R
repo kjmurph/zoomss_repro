@@ -247,9 +247,62 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
     param2$mat_ogive[g, param2$w_log10 > Groups$Wmax[g]] <- 0
   }
 
+  # =============================================================================
+  # EFFORT-DRIVEN FISHING PARAMETERS
+  # =============================================================================
+  # Detect whether effort time series columns are present in input_params.
+  # Expected columns: effort_small, effort_med, effort_large (one per fish group).
+  # When present, fishing mortality is calculated dynamically each time step as:
+  #   F(w,t) = Effort(t) * q * Selectivity(w)
+  # When absent, the model falls back to the existing static Fmort pathway.
+
+  effort_cols <- c("effort_small", "effort_med", "effort_large")
+  effort_available <- all(effort_cols %in% names(input_params))
+
+  if (effort_available) {
+    cat("Effort time series detected — enabling effort-driven fishing\n")
+
+    # Validate q column exists in Groups
+    if (!"q" %in% names(Groups)) {
+      stop("Groups must contain a 'q' (catchability) column when effort data is provided.\n",
+           "  Add q values to Groups or use setFishingParams() to set up fishing parameters.")
+    }
+
+    # Store effort matrix (ntime x num_fish)
+    param2$effort <- as.matrix(input_params[, effort_cols, drop = FALSE])
+    colnames(param2$effort) <- effort_cols
+
+    # Store catchability per fish group (vector, length = num_fish)
+    param2$q <- Groups$q[param$fish_grps]
+    names(param2$q) <- Groups$Species[param$fish_grps]
+
+    # Pre-calculate selectivity vectors per fish group (knife-edge at Fmort_W0)
+    # selectivity[f, ] = 1 where w_log10 >= Fmort_W0 AND w_log10 <= Fmort_Wmax, else 0
+    # Stored as full ngrps x ngrid matrix (zeros for non-fish groups)
+    param2$selectivity <- matrix(0, nrow = param$ngrps, ncol = param2$ngrid)
+    for (f in 1:param$num_fish) {
+      fg <- param$fish_grps[f]
+      sel_idx <- which(param2$w_log10 >= Groups$Fmort_W0[fg] &
+                       param2$w_log10 <= Groups$Fmort_Wmax[fg])
+      param2$selectivity[fg, sel_idx] <- 1
+    }
+
+    param2$effort_fishing <- TRUE
+    cat("  Catchability (q):", paste(names(param2$q), "=", param2$q, collapse = ", "), "\n")
+    cat("  Effort columns:", paste(effort_cols, collapse = ", "), "\n")
+
+  } else {
+    param2$effort_fishing <- FALSE
+    # Static Fmort pathway will be used (existing behaviour)
+    if (any(Groups$Fmort > 0)) {
+      cat("Using static fishing mortality (no effort time series)\n")
+    }
+  }
+
   # Final parameter combination
   # Exclude time series vectors from input_params since they're now stored as _ts arrays in param2
-  input_params_filtered <- input_params[!names(input_params) %in% c("tmax", "dt", "isave", "time_step", "phyto_int", "phyto_slope", "phyto_max")]
+  input_params_filtered <- input_params[!names(input_params) %in% c("tmax", "dt", "isave", "time_step", "phyto_int", "phyto_slope", "phyto_max",
+                                                                     "effort_small", "effort_med", "effort_large")]
 
   param_final <- c(input_params_filtered, param, param2)
   return(param_final)
