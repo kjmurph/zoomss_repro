@@ -516,7 +516,7 @@ mdl_pulse <- zoomss_model(input_params = env_pulse, Groups = Groups_pulse, isave
 ```{r fig.height=9}
 # Effort time series for context
 effort_df <- data.frame(time = mdl_pulse$time,
-                        effort = effort_pulse[seq(1, n_total, by = 5)])
+                        effort = approx(time_vec, effort_pulse, xout = mdl_pulse$time)$y)
 
 p_effort <- ggplot(effort_df, aes(x = time, y = effort)) +
   geom_area(fill = "grey80", alpha = 0.7) +
@@ -585,7 +585,7 @@ mdl_ramp <- zoomss_model(input_params = env_ramp, Groups = Groups_ramp, isave = 
 # Effort ramp
 effort_ramp_df <- data.frame(
   time = mdl_ramp$time,
-  effort = effort_ramp[seq(1, n_ramp, by = 5)]
+  effort = approx(time_ramp, effort_ramp, xout = mdl_ramp$time)$y
 )
 
 p_eff_ramp <- ggplot(effort_ramp_df, aes(x = time, y = effort)) +
@@ -619,6 +619,42 @@ As effort ramps up, watch for:
 - The point where catch for each group peaks and then declines (approaching or exceeding MSY)
 - Progressive depletion of fish groups from largest to smallest
 - Shifts in community composition toward zooplankton dominance
+
+## Part 8: Catchability Sensitivity Analysis
+
+To understand how catchability (q) influences equilibrium biomass and yield, we hold effort constant and vary q across a range of values for each size group.
+This helps identify thresholds where increased catchability leads to disproportionate biomass decline or yield collapse.
+
+```{r}
+q_levels <- c(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5)
+
+results_q <- list()
+
+for (i in seq_along(q_levels)) {
+  Groups_q <- setFishingParams(Groups,
+                               q_small = q_levels[i],
+                               q_med   = q_levels[i],
+                               q_large = q_levels[i])
+  
+  env_q <- createInputParams(
+    time = seq(0, 200, by = 0.1),
+    sst = 15,
+    chl = 1.0
+  )
+  
+  env_q <- addFishingEffort(env_q,
+                            effort_small = 1.0,
+                            effort_med   = 1.0,
+                            effort_large = 1.0)
+  
+  results_q[[i]] <- zoomss_model(
+    input_params = env_q,
+    Groups = Groups_q,
+    isave = 5
+  )
+}
+```
+
 
 ## Summary
 
