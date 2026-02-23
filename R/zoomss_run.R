@@ -398,8 +398,13 @@ zoomss_run <- function(model){
         # recruits = (R_total * repro_eff) / (w_min * dx)
         recruitment_flux <- (R_total * repro_eff[fg]) / (w[min_idx] * dx)
 
-        # Add recruitment to smallest size class
-        N[fg, min_idx] <- N[fg, min_idx] + recruitment_flux * dt
+        # Semi-implicit boundary condition for recruitment
+        # Balances recruitment input against mortality (Z) and growth-out (gg/dx)
+        # at the minimum size class, consistent with the interior MvF scheme.
+        # Without the denominator, N[min_idx] accumulates without bound because
+        # the MvF solver (which starts at min_idx+1) never applies mortality or
+        # advection at the boundary.
+        N[fg, min_idx] <- (N[fg, min_idx] + recruitment_flux * dt) / (1 + dt * Z[fg, min_idx] + (dt / dx) * gg[fg, min_idx])
 
       } else {
         # Original boundary condition for fish without reproduction
