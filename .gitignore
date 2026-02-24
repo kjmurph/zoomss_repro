@@ -10,3 +10,5 @@ inst/doc
 # Vignette cache directories (large model simulation outputs)
 *_cache/
 *_files/
+
+*cache/
