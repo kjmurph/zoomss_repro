@@ -268,9 +268,9 @@ To understand how the ecosystem responds across a range of fishing pressures, we
 effort_levels <- c(0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0)
 
 Groups_grad <- setFishingParams(Groups,
-                                q_small = 0.01,
-                                q_med   = 0.02,
-                                q_large = 0.03)
+                                q_small = 1,
+                                q_med   = 1,
+                                q_large = 1)
 
 results_effort <- list()
 
@@ -626,7 +626,7 @@ To understand how catchability (q) influences equilibrium biomass and yield, we 
 This helps identify thresholds where increased catchability leads to disproportionate biomass decline or yield collapse.
 
 ```{r}
-q_levels <- c(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5)
+q_levels <- c(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1)
 
 results_q <- list()
 
@@ -654,6 +654,160 @@ for (i in seq_along(q_levels)) {
   )
 }
 ```
+
+
+### Equilibrium Yield, Biomass, SSB and Recruitment vs Catchability
+
+We extract equilibrium values (averaged over the final 20% of the time series) for each catchability level — the same approach used for the effort gradient in Part 4, but now sweeping across $q$ while effort is fixed at 1.0. Since $F = q \times \text{Effort}$, this directly reveals the sensitivity of equilibrium outcomes to the catchability parameter estimated during calibration.
+
+```{r fig.height=10}
+num_fish <- 3
+fish_names <- c("Fish_Small", "Fish_Med", "Fish_Large")
+
+q_summary <- data.frame(
+  q = rep(q_levels, each = num_fish),
+  fish_group = rep(fish_names, length(q_levels)),
+  eq_catch = NA,
+  eq_biomass = NA,
+  eq_SSB = NA,
+  eq_recruitment = NA
+)
+
+for (i in seq_along(q_levels)) {
+  mdl_i <- results_q[[i]]
+  nsave <- length(mdl_i$time)
+  fish_grps <- mdl_i$param$fish_grps
+
+  # Average over final 20% of time series
+  final_idx <- max(1, floor(nsave * 0.8)):nsave
+
+  for (f in 1:num_fish) {
+    row_idx <- (i - 1) * num_fish + f
+    fg <- fish_grps[f]
+
+    # Equilibrium biomass (from abundance)
+    avg_biomass <- mean(apply(mdl_i$abundance[final_idx, fg, , drop = FALSE], 1, function(row) {
+      sum(row * mdl_i$param$w * mdl_i$param$dx)
+    }))
+    q_summary$eq_biomass[row_idx] <- avg_biomass
+
+    # Equilibrium SSB and recruitment
+    q_summary$eq_SSB[row_idx] <- mean(mdl_i$SSB[final_idx, f], na.rm = TRUE)
+    q_summary$eq_recruitment[row_idx] <- mean(mdl_i$recruitment[final_idx, f], na.rm = TRUE)
+
+    # Equilibrium catch
+    if (!is.null(mdl_i$catch)) {
+      q_summary$eq_catch[row_idx] <- mean(mdl_i$catch[final_idx, f], na.rm = TRUE)
+    } else {
+      q_summary$eq_catch[row_idx] <- 0
+    }
+  }
+}
+
+fish_colours <- get_fish_colours(results_q[[1]])
+
+# Yield-Catchability curve
+p_yield_q <- ggplot(q_summary, aes(x = q, y = eq_catch, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_colours) +
+  scale_x_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium Catch (g WW)",
+       title = "Yield-Catchability Curve", colour = "Fish Group")
+
+# Biomass depletion vs q
+p_biomass_q <- ggplot(q_summary, aes(x = q, y = eq_biomass, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_colours) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium Biomass",
+       title = "Biomass Depletion vs Catchability", colour = "Fish Group")
+
+# SSB vs q
+p_ssb_q <- ggplot(q_summary, aes(x = q, y = eq_SSB, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_colours) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium SSB",
+       title = "SSB vs Catchability", colour = "Fish Group")
+
+# Recruitment vs q
+p_rec_q <- ggplot(q_summary, aes(x = q, y = eq_recruitment, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_colours) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium Recruitment",
+       title = "Recruitment vs Catchability", colour = "Fish Group")
+
+wrap_plots(p_yield_q, p_biomass_q, p_ssb_q, p_rec_q, ncol = 1, guides = "collect")
+```
+
+The yield-catchability curve should show a similar dome shape to the yield-effort curve: at low $q$ values, increasing catchability increases catch proportionally; beyond some critical threshold, stock depletion dominates and total yield declines. Because $q$ acts as a multiplier on effort, the $q$ at peak yield approximates $q_{\text{MSY}}$ when effort is held at 1.0.
+
+Note the log-scaled x-axis — catchability spans over two orders of magnitude, and the nonlinear response highlights how sensitive equilibrium outcomes are to this parameter. This underscores why accurate $q$ estimation during calibration is critical.
+
+### Biomass Depletion Ratio
+
+To express the impact of catchability in relative terms, we normalise equilibrium biomass against the unfished reference (lowest $q$ level, which has negligible fishing mortality).
+
+```{r fig.height=5}
+# Calculate depletion ratio relative to lowest q (effectively unfished)
+ref_biomass <- q_summary %>%
+  filter(q == min(q_levels)) %>%
+  select(fish_group, ref_biomass = eq_biomass)
+
+q_depletion <- q_summary %>%
+  left_join(ref_biomass, by = "fish_group") %>%
+  mutate(depletion = eq_biomass / ref_biomass)
+
+ggplot(q_depletion, aes(x = q, y = depletion, colour = fish_group)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", colour = "grey40") +
+  geom_hline(yintercept = 0.2, linetype = "dotted", colour = "red") +
+  annotate("text", x = max(q_levels), y = 0.52,
+           label = "B/B0 = 0.5", hjust = 1, size = 3) +
+  annotate("text", x = max(q_levels), y = 0.22,
+           label = "B/B0 = 0.2", hjust = 1, size = 3, colour = "red") +
+  scale_colour_manual(values = fish_colours) +
+  scale_x_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)",
+       y = expression(B / B[0]),
+       title = "Biomass Depletion Ratio Across Catchability Gradient",
+       colour = "Fish Group")
+```
+
+The dashed line at $B/B_0 = 0.5$ marks a common reference point for maximum sustainable yield. The dotted red line at $B/B_0 = 0.2$ indicates severely depleted stock levels. The $q$ value at which each fish group crosses these thresholds provides practical guidance on the range of catchability estimates that are ecologically sustainable.
+
+### Size Spectra: Low vs High Catchability
+
+Comparing size spectra at the extremes of the catchability gradient reveals how gear efficiency reshapes community structure.
+
+```{r fig.height=6}
+idx_low <- 1                  # lowest q
+idx_high <- length(q_levels)  # highest q
+
+p_spec_low_q <- plotSizeSpectra(results_q[[idx_low]], n_years = 10) +
+  ggtitle(paste0("Low Catchability (q = ", q_levels[idx_low], ") - Size Spectrum"))
+
+p_spec_high_q <- plotSizeSpectra(results_q[[idx_high]], n_years = 10) +
+  ggtitle(paste0("High Catchability (q = ", q_levels[idx_high], ") - Size Spectrum"))
+
+wrap_plots(p_spec_low_q, p_spec_high_q, ncol = 1, guides = "collect")
+```
+
+At low catchability the size spectrum retains its unfished shape with abundant large-bodied organisms. At high catchability, selective removal steepens the spectrum — large fish are severely depleted while smaller groups and zooplankton may increase due to competitive and predation release.
 
 
 ## Summary
