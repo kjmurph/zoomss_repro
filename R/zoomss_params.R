@@ -82,8 +82,8 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
     dt = dt_calc, # timestep - calculated from time
     w0 = 10^(min(Groups$W0)),		# minimum size class
     wMax = 10^(max(Groups$Wmax)),# maximum size class
-    ZSpre = 1, # senescence mortality prefactor
-    ZSexp = 0.3, # senescence mortality exponent
+    # ZSpre = 1, # senescence mortality prefactor
+    # ZSexp = 0.3, # senescence mortality exponent
     w0_phyto = 10^(-14.5), # minimum phytoplankton size class (1um)
     # wMax_phyto will be calculated from time series
     zoo_grps = which(Groups$Type == "Zooplankton"), # Which rows are zooplankton

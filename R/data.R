@@ -28,6 +28,8 @@
 #'   \item{repro_eff}{Numeric. Reproductive efficiency - egg-to-recruit survival fraction (fish only)}
 #'   \item{repro_on}{Integer. Flag to enable reproduction (0 = off, 1 = on; fish only)}
 #'   \item{mat_ogive_slope}{Numeric. Steepness of maturity ogive function (typically 10)}
+#'   \item{ZSpre}{Numeric. Senescence mortality pre-factor (group-specific)}
+#'   \item{ZSexp}{Numeric. Senescence mortality exponent (group-specific)}
 #'   \item{Fmort}{Numeric. Fishing mortality rate}
 #'   \item{Fmort_W0}{Numeric. Log10 minimum weight for fishing mortality}
 #'   \item{Fmort_Wmax}{Numeric. Log10 maximum weight for fishing mortality}

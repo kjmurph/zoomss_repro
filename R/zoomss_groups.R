@@ -175,10 +175,17 @@ validateGroups <- function(groups) {
                          msg = "Groups must be a data frame")
 
   # Check required columns exist (based on new energy budget structure)
+  # required_cols <- c("Species", "Type", "FeedType", "Prop", "W0", "Wmax", "Wmat",
+  #                    "SearchCoef", "SearchExp", "PPMRscale", "PPMR", "FeedWidth",
+  #                    "Carbon", "def_high", "def_low", "f_M", "K_growth",
+  #                    "repro_eff", "repro_on", "mat_ogive_slope",
+  #                    "Fmort", "Fmort_W0", "Fmort_Wmax", "PlotColour")
+
   required_cols <- c("Species", "Type", "FeedType", "Prop", "W0", "Wmax", "Wmat",
                      "SearchCoef", "SearchExp", "PPMRscale", "PPMR", "FeedWidth",
                      "Carbon", "def_high", "def_low", "f_M", "K_growth",
                      "repro_eff", "repro_on", "mat_ogive_slope",
+                     "ZSpre", "ZSexp",
                      "Fmort", "Fmort_W0", "Fmort_Wmax", "PlotColour")
 
   missing_cols <- setdiff(required_cols, names(groups))
@@ -281,6 +288,13 @@ validateGroups <- function(groups) {
 
   assertthat::assert_that(all(groups$mat_ogive_slope > 0),
                          msg = "mat_ogive_slope must be positive")
+
+  # Check senescence parameters
+  assertthat::assert_that(all(groups$ZSpre >= 0),
+                          msg = "ZSpre (senescence prefactor) must be non-negative")
+
+  assertthat::assert_that(all(groups$ZSexp > 0 & groups$ZSexp <= 2),
+                          msg = "ZSexp (senescence exponent) must be between 0 and 2")
 
   # Check fishing mortality is non-negative
   assertthat::assert_that(all(groups$Fmort >= 0),

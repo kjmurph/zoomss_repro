@@ -219,17 +219,23 @@ zoomss_setup <- function(param){
   #### CALCULATES CONSTANT BITS OF THE MODEL FUNCTIONS FOR EACH GROUP
   for(i in 1:param$ngrps){
     ## Base senescence mortality (before temperature effect)
-    if(param$Groups$Type[i] == "Zooplankton"){
-      model$M_sb_base[i,] <- param$ZSpre*(param$w/(10^(param$Groups$Wmat[i])))^param$ZSexp
-      model$M_sb_base[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
-      model$M_sb_base[i, 10^(param$Groups$Wmat[i]) > param$w] <- 0
-    }
+    # if(param$Groups$Type[i] == "Zooplankton"){
+    #   model$M_sb_base[i,] <- param$ZSpre*(param$w/(10^(param$Groups$Wmat[i])))^param$ZSexp
+    #   model$M_sb_base[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
+    #   model$M_sb_base[i, 10^(param$Groups$Wmat[i]) > param$w] <- 0
+    # }
+    #
+    # if(param$Groups$Type[i] == "Fish"){
+    #   model$M_sb_base[i,] <- 0.1*param$ZSpre*(param$w/(10^(param$Groups$Wmat[i])))^param$ZSexp
+    #   model$M_sb_base[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
+    #   model$M_sb_base[i, 10^(param$Groups$Wmat[i]) > param$w] <- 0
+    # }
 
-    if(param$Groups$Type[i] == "Fish"){
-      model$M_sb_base[i,] <- 0.1*param$ZSpre*(param$w/(10^(param$Groups$Wmat[i])))^param$ZSexp
+    ## Base senescence mortality (before temperature effect)
+    ## Uses group-specific ZSpre and ZSexp from GroupInputs
+      model$M_sb_base[i,] <- param$Groups$ZSpre[i] * (param$w / (10^(param$Groups$Wmat[i])))^param$Groups$ZSexp[i]
       model$M_sb_base[i, 10^(param$Groups$Wmax[i]) < param$w] <- 0
       model$M_sb_base[i, 10^(param$Groups$Wmat[i]) > param$w] <- 0
-    }
 
     ### Search volume
     SearchVol[i,] <- (param$Groups$SearchCoef[i])*(param$w^(param$Groups$SearchExp[i]))
