@@ -63,7 +63,7 @@
 #' results <- zoomss_model(input_params, custom_groups)
 #' }
 #'
-zoomss_model <- function(input_params, Groups = NULL, isave = 1, energy_budget_scenario = "A"){
+zoomss_model <- function(input_params, Groups = NULL, isave = 1){
 
   # Handle default Groups parameter
   if (is.null(Groups)) {
@@ -83,7 +83,7 @@ zoomss_model <- function(input_params, Groups = NULL, isave = 1, energy_budget_s
   }
 
   ################### RUN THE MODEL ###################
-  param <- zoomss_params(Groups, input_params, isave, energy_budget_scenario) # Set up parameter list
+  param <- zoomss_params(Groups, input_params, isave) # Set up parameter list
   model <- zoomss_setup(param) # Set up model equation stuff
   model_output <- zoomss_run(model) # Run the model
 

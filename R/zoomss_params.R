@@ -55,7 +55,7 @@
 #'
 #' @noRd
 #'
-zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = "A"){
+zoomss_params <- function(Groups, input_params, isave){
 
   # Calculate dt and tmax from time column in input_params
   time_values <- input_params$time
@@ -161,64 +161,52 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
   param2$ngridPP <- length(param2$w_phyto) # total number of size classes for phyto
 
   # =============================================================================
-  # ENERGY BUDGET DERIVED PARAMETERS
+  # FISH ENERGY BUDGET DERIVED PARAMETERS
   # =============================================================================
+  # Only fish groups use the explicit energy budget.
+  # Zooplankton use the original GGE pathway (GrossGEscale * Carbon).
 
-  # Derived reproduction fraction (R_frac = 1 - f_M - K_growth)
-  param2$R_frac <- 1 - Groups$f_M - Groups$K_growth
+  # Derived reproduction fraction for fish (R_frac = 1 - f_M - K_growth)
+  # Set to 0 for zooplankton (they don't use this pathway)
+  param2$R_frac <- rep(0, param$ngrps)
   names(param2$R_frac) <- Groups$Species
 
-  # Energy budget closure validation
-  budget_sum <- Groups$f_M + Groups$K_growth + param2$R_frac
-  if (any(abs(budget_sum - 1.0) > 1e-10)) {
-    bad_groups <- Groups$Species[abs(budget_sum - 1.0) > 1e-10]
-    stop(paste("Energy budget does not sum to 1.0 for groups:",
-               paste(bad_groups, collapse = ", ")))
-  }
-  if (any(param2$R_frac < 0)) {
-    bad_groups <- Groups$Species[param2$R_frac < 0]
-    stop(paste("R_frac is negative (f_M + K_growth > 1) for groups:",
-               paste(bad_groups, collapse = ", ")))
+  for (f in seq_along(param$fish_grps)) {
+    fg <- param$fish_grps[f]
+    param2$R_frac[fg] <- 1 - Groups$f_M[fg] - Groups$K_growth[fg]
   }
 
-  # ──────────────────────────────────────────────────────
-  # Energy budget scenario configuration
-  # ──────────────────────────────────────────────────────
-  # "A" = Full energy budget: f_M + K_growth + R_frac for all groups
-  # "B" = R_frac = 0 for zooplankton (redistributed to K_growth)
-  #       Fish groups retain their R_frac values unchanged
-
-  # Validate energy budget scenario
-  energy_budget_scenario <- match.arg(energy_budget_scenario, choices = c("A", "B"))
-
-  if (energy_budget_scenario == "B") {
-    zoo_idx <- param$zoo_grps
-
-    # Redistribute zooplankton R_frac to K_growth
-    Groups$K_growth[zoo_idx] <- Groups$K_growth[zoo_idx] + param2$R_frac[zoo_idx]
-    param2$R_frac[zoo_idx] <- 0.0
-
-    # Update the Groups data frame in param to stay consistent
-    param$Groups <- Groups
-
-    cat("Scenario B applied: R_frac = 0 for zooplankton groups\n")
-    cat("  Affected groups:", paste(Groups$Species[zoo_idx], collapse = ", "), "\n")
-
-    # Re-validate after scenario adjustment
-    budget_sum <- Groups$f_M + Groups$K_growth + param2$R_frac
-    stopifnot(all(abs(budget_sum - 1.0) < 1e-10))
+  # Validate fish energy budget closure
+  for (f in seq_along(param$fish_grps)) {
+    fg <- param$fish_grps[f]
+    budget_sum <- Groups$f_M[fg] + Groups$K_growth[fg] + param2$R_frac[fg]
+    if (abs(budget_sum - 1.0) > 1e-10) {
+      stop(paste("Fish energy budget does not sum to 1.0 for:", Groups$Species[fg]))
+    }
+    if (param2$R_frac[fg] < 0) {
+      stop(paste("R_frac is negative (f_M + K_growth > 1) for:", Groups$Species[fg]))
+    }
   }
 
-  cat("Energy budget loaded for", param$ngrps, "groups (Scenario", energy_budget_scenario, ")\n")
-  cat("  f_M range:      ", range(Groups$f_M), "\n")
-  cat("  K_growth range:  ", range(Groups$K_growth), "\n")
-  cat("  R_frac range:    ", range(param2$R_frac), "\n")
+  cat("Dual-pathway model:\n")
+  cat("  Zooplankton: GGE pathway (GrossGEscale * Carbon)\n")
+  cat("  Fish: Explicit energy budget\n")
+  if (param$num_fish > 0) {
+    cat("    f_M range:      ", range(Groups$f_M[param$fish_grps]), "\n")
+    cat("    K_growth range:  ", range(Groups$K_growth[param$fish_grps]), "\n")
+    cat("    R_frac range:    ", range(param2$R_frac[param$fish_grps]), "\n")
+  }
 
-  # Phytoplankton defecation - continuous scaling based on cc_phyto Carbon content
+  # Phytoplankton defecation for fish groups — continuous scaling based on cc_phyto
   # def = def_high + (def_low - def_high) * (1 - Carbon / Carbon_max)
-  # Use mean def_high/def_low across groups for phyto (they should be same for all)
-  param2$def_phyto <- mean(Groups$def_high) +
-    (mean(Groups$def_low) - mean(Groups$def_high)) * (1 - param$cc_phyto / param$Carbon_max)
+  # Use fish group values (they should be identical across fish)
+  if (param$num_fish > 0) {
+    fg1 <- param$fish_grps[1]
+    param2$def_phyto <- Groups$def_high[fg1] +
+      (Groups$def_low[fg1] - Groups$def_high[fg1]) * (1 - param$cc_phyto / param$Carbon_max)
+  } else {
+    param2$def_phyto <- 0.3  # fallback
+  }
 
   # Maturation size indices for each group (index of Wmat in w_log10 grid)
   param2$mat_size_idx <- sapply(1:param$ngrps, function(g) {
@@ -250,17 +238,31 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
   # =============================================================================
   # EFFORT-DRIVEN FISHING PARAMETERS
   # =============================================================================
-  # Detect whether effort time series columns are present in input_params.
-  # Expected columns: effort_small, effort_med, effort_large (one per fish group).
+  # Detect effort time series columns dynamically based on fish groups present.
+  # Expected column naming convention: effort_{Species} where Species is the
+  # fish group name converted to lowercase with spaces replaced by underscores.
+  # e.g., Fish_Small -> effort_fish_small, Fish_Med -> effort_fish_med
+  #
   # When present, fishing mortality is calculated dynamically each time step as:
   #   F(w,t) = Effort(t) * q * Selectivity(w)
   # When absent, the model falls back to the existing static Fmort pathway.
 
-  effort_cols <- c("effort_small", "effort_med", "effort_large")
-  effort_available <- all(effort_cols %in% names(input_params))
+  if (param$num_fish > 0) {
+    # Build expected column names from fish group Species names
+    fish_species <- Groups$Species[param$fish_grps]
+    effort_cols <- paste0("effort_", tolower(gsub(" ", "_", fish_species)))
+    names(effort_cols) <- fish_species
+
+    effort_available <- all(effort_cols %in% names(input_params))
+  } else {
+    effort_cols <- character(0)
+    effort_available <- FALSE
+  }
 
   if (effort_available) {
     cat("Effort time series detected — enabling effort-driven fishing\n")
+    cat("  Fish groups:", paste(fish_species, collapse = ", "), "\n")
+    cat("  Effort columns:", paste(effort_cols, collapse = ", "), "\n")
 
     # Validate q column exists in Groups
     if (!"q" %in% names(Groups)) {
@@ -274,7 +276,7 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
 
     # Store catchability per fish group (vector, length = num_fish)
     param2$q <- Groups$q[param$fish_grps]
-    names(param2$q) <- Groups$Species[param$fish_grps]
+    names(param2$q) <- fish_species
 
     # Pre-calculate selectivity vectors per fish group (knife-edge at Fmort_W0)
     # selectivity[f, ] = 1 where w_log10 >= Fmort_W0 AND w_log10 <= Fmort_Wmax, else 0
@@ -283,18 +285,17 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
     for (f in 1:param$num_fish) {
       fg <- param$fish_grps[f]
       sel_idx <- which(param2$w_log10 >= Groups$Fmort_W0[fg] &
-                       param2$w_log10 <= Groups$Fmort_Wmax[fg])
+                         param2$w_log10 <= Groups$Fmort_Wmax[fg])
       param2$selectivity[fg, sel_idx] <- 1
     }
 
     param2$effort_fishing <- TRUE
     cat("  Catchability (q):", paste(names(param2$q), "=", param2$q, collapse = ", "), "\n")
-    cat("  Effort columns:", paste(effort_cols, collapse = ", "), "\n")
 
   } else {
     param2$effort_fishing <- FALSE
     # Static Fmort pathway will be used (existing behaviour)
-    if (any(Groups$Fmort > 0)) {
+    if (param$num_fish > 0 && any(Groups$Fmort[param$fish_grps] > 0)) {
       cat("Using static fishing mortality (no effort time series)\n")
     }
   }
@@ -302,7 +303,7 @@ zoomss_params <- function(Groups, input_params, isave, energy_budget_scenario = 
   # Final parameter combination
   # Exclude time series vectors from input_params since they're now stored as _ts arrays in param2
   input_params_filtered <- input_params[!names(input_params) %in% c("tmax", "dt", "isave", "time_step", "phyto_int", "phyto_slope", "phyto_max",
-                                                                     "effort_small", "effort_med", "effort_large")]
+                                                                    effort_cols)]
 
   param_final <- c(input_params_filtered, param, param2)
   return(param_final)

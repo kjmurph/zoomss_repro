@@ -89,29 +89,37 @@ zoomss_setup <- function(param){
     fish_mort = matrix(0, nrow = param$ngrps, ncol = param$ngrid), # fishing mortality
 
     # ==========================================================================
-    # ENERGY BUDGET PARAMETERS (replacing assim_eff)
+    # DUAL-PATHWAY GROWTH PARAMETERS
     # ==========================================================================
 
-    # Energy budget fractions (group-specific, constant across sizes)
-    # def_high and def_low are used for continuous defecation scaling based on prey Carbon
-    def_high = param$Groups$def_high,  # Defecation for high-C prey (vector, ngrps)
-    def_low = param$Groups$def_low,    # Defecation for low-C prey (vector, ngrps)
-    f_M = param$Groups$f_M,            # Metabolic fraction of assimilated (vector, ngrps)
-    K_growth = param$Groups$K_growth,  # Growth fraction of assimilated (vector, ngrps)
-    R_frac = param$R_frac,             # Reproduction fraction of assimilated (derived, vector, ngrps)
+    # --- Zooplankton GGE pathway ---
+    # assim_eff_gge[j, w] = GrossGEscale[j] * Carbon[j] for all w
+    # This is a PREY property: when group j is consumed, the predator gains
+    # GrossGEscale[j] * Carbon[j] efficiency. All groups (including fish) must
+    # have valid values because colSums(N * assim_eff_gge) sums over all prey.
+    # For fish PREDATORS, growth is overwritten by the energy budget pathway.
+    assim_eff_gge = matrix(param$Groups$GrossGEscale * param$Groups$Carbon,
+                           nrow = param$ngrps, ncol = param$ngrid),
 
-    # Prey Carbon content for defecation scaling (prey-specific)
-    prey_Carbon = param$Groups$Carbon, # Carbon content of each group as prey (vector, ngrps)
-    Carbon_max = param$Carbon_max,     # Maximum Carbon across groups (for scaling)
-    def_phyto = param$def_phyto,       # Defecation for phytoplankton (scalar)
+    # --- Fish energy budget pathway ---
+    # These are used only for fish predators (fish_grps)
+    def_high = param$Groups$def_high,    # Defecation for high-C prey (vector, ngrps)
+    def_low = param$Groups$def_low,      # Defecation for low-C prey (vector, ngrps)
+    f_M = param$Groups$f_M,              # Metabolic fraction of assimilated (vector, ngrps)
+    K_growth = param$Groups$K_growth,    # Growth fraction of assimilated (vector, ngrps)
+    R_frac = param$R_frac,               # Reproduction fraction (0 for zoo, derived for fish)
+
+    # Prey Carbon content for defecation scaling
+    prey_Carbon = param$Groups$Carbon,   # Carbon content of each group as prey
+    Carbon_max = param$Carbon_max,       # Maximum Carbon across groups
+    def_phyto = param$def_phyto,         # Defecation for phytoplankton (fish pathway)
 
     # Maturity ogive for reproduction (group x size)
-    mat_ogive = param$mat_ogive,       # Maturity fraction at each size (matrix, ngrps x ngrid)
+    mat_ogive = param$mat_ogive,
 
     # Reproduction parameters
-    repro_eff = param$Groups$repro_eff,  # Reproductive efficiency (vector, ngrps)
-    repro_on = param$Groups$repro_on,    # Reproduction enabled flag (vector, ngrps)
-
+    repro_eff = param$Groups$repro_eff,
+    repro_on = param$Groups$repro_on,
     # ==========================================================================
 
     # Temperature effects matrix - initialize with first timestep values
@@ -155,12 +163,16 @@ zoomss_setup <- function(param){
   )
 
   # Set phyto_theta for carnivores
-  model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0 # Carnivorous groups can't eat phyto
+  model$phyto_theta[which(param$Groups$FeedType == 'Carnivore'),] <- 0
 
-  # Calculate assimilation efficiency for phytoplankton (used in kernel calculations)
-  # This is pure assimilation only: (1 - defecation). K_growth partitioning happens
-  # post-hoc in zoomss_run.R to avoid double-counting.
-  assim_phyto <- rep(1 - param$def_phyto, param$ngrps)
+  # Phytoplankton assimilation — DUAL PATHWAY
+  # Zooplankton: GrossGEscale * cc_phyto (original approach, final efficiency)
+  # Fish: (1 - def_phyto) (pure assimilation; K_growth applied post-hoc in run)
+  assim_phyto <- numeric(param$ngrps)
+  assim_phyto[param$zoo_grps] <- param$Groups$GrossGEscale[param$zoo_grps] * param$cc_phyto
+  if (param$num_fish > 0) {
+    assim_phyto[param$fish_grps] <- 1 - param$def_phyto
+  }
 
   #### INITIAL DYNAMIC POPULATION ABUNDANCES
   # Use the first time step for initial conditions
@@ -343,30 +355,24 @@ zoomss_setup <- function(param){
   model$dynam_dietkernel <- sweep(dynam_theta, c(1,2,4), model$dynam_dietkernel, "*")
 
   # ==========================================================================
-  # PRE-CALCULATE PREY-SPECIFIC DEFECATION SCALING FOR DYNAMIC SPECTRUM
+  # FISH-ONLY: PRE-CALCULATE PREY-SPECIFIC DEFECATION FOR DYNAMIC SPECTRUM
   # ==========================================================================
-  # def_prey[j] = def_high + (def_low - def_high) * (1 - Carbon[j] / Carbon_max)
-  # This gives defecation fraction for predator when eating prey group j
-  # Lower Carbon = higher defecation (lower quality food)
+  # def_prey[pred, prey] = def_high + (def_low - def_high) * (1 - Carbon[prey] / Carbon_max)
+  # Only needed for fish predators; zooplankton use GGE pathway.
 
-  # Create matrix of defecation by predator (row) and prey (col)
-  # Uses predator's def_high and def_low, scaled by prey's Carbon
-  model$def_by_prey <- matrix(NA, nrow = param$ngrps, ncol = param$ngrps)
-  for (pred in 1:param$ngrps) {
-    for (prey in 1:param$ngrps) {
-      carbon_fraction <- model$prey_Carbon[prey] / model$Carbon_max
-      model$def_by_prey[pred, prey] <- model$def_high[pred] +
-        (model$def_low[pred] - model$def_high[pred]) * (1 - carbon_fraction)
+  model$def_by_prey <- matrix(0, nrow = param$ngrps, ncol = param$ngrps)
+  model$assim_by_prey <- matrix(0, nrow = param$ngrps, ncol = param$ngrps)
+
+  if (param$num_fish > 0) {
+    for (f in seq_along(param$fish_grps)) {
+      pred <- param$fish_grps[f]
+      for (prey in 1:param$ngrps) {
+        carbon_fraction <- model$prey_Carbon[prey] / model$Carbon_max
+        model$def_by_prey[pred, prey] <- model$def_high[pred] +
+          (model$def_low[pred] - model$def_high[pred]) * (1 - carbon_fraction)
+        model$assim_by_prey[pred, prey] <- 1 - model$def_by_prey[pred, prey]
+      }
     }
-  }
-
-  # Pre-calculate assimilation efficiency by predator-prey combination
-  # assim_by_prey[pred, prey] = (1 - def_by_prey[pred, prey])
-  # This is pure assimilation only. K_growth partitioning happens post-hoc
-  # in zoomss_run.R to avoid double-counting.
-  model$assim_by_prey <- matrix(NA, nrow = param$ngrps, ncol = param$ngrps)
-  for (pred in 1:param$ngrps) {
-    model$assim_by_prey[pred, ] <- (1 - model$def_by_prey[pred, ])
   }
 
   return(model)

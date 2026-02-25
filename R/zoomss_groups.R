@@ -172,17 +172,12 @@ validateGroups <- function(groups) {
 
   # Check that groups is a data frame
   assertthat::assert_that(is.data.frame(groups),
-                         msg = "Groups must be a data frame")
+                          msg = "Groups must be a data frame")
 
-  # Check required columns exist (based on new energy budget structure)
-  # required_cols <- c("Species", "Type", "FeedType", "Prop", "W0", "Wmax", "Wmat",
-  #                    "SearchCoef", "SearchExp", "PPMRscale", "PPMR", "FeedWidth",
-  #                    "Carbon", "def_high", "def_low", "f_M", "K_growth",
-  #                    "repro_eff", "repro_on", "mat_ogive_slope",
-  #                    "Fmort", "Fmort_W0", "Fmort_Wmax", "PlotColour")
-
+  # Check required columns exist (dual-pathway: GGE for zoo, energy budget for fish)
   required_cols <- c("Species", "Type", "FeedType", "Prop", "W0", "Wmax", "Wmat",
                      "SearchCoef", "SearchExp", "PPMRscale", "PPMR", "FeedWidth",
+                     "GrossGEscale",
                      "Carbon", "def_high", "def_low", "f_M", "K_growth",
                      "repro_eff", "repro_on", "mat_ogive_slope",
                      "ZSpre", "ZSexp",
@@ -190,122 +185,122 @@ validateGroups <- function(groups) {
 
   missing_cols <- setdiff(required_cols, names(groups))
   assertthat::assert_that(length(missing_cols) == 0,
-                         msg = paste("Missing required columns:", paste(missing_cols, collapse = ", ")))
+                          msg = paste("Missing required columns:", paste(missing_cols, collapse = ", ")))
 
-  # Check data types and ranges
+  # --- Shared checks (all groups) ---
+
   assertthat::assert_that(is.character(groups$Species) || is.factor(groups$Species),
-                         msg = "Species column must be character or factor")
+                          msg = "Species column must be character or factor")
 
   assertthat::assert_that(all(!is.na(groups$Species)),
-                         msg = "Species names cannot be NA")
+                          msg = "Species names cannot be NA")
 
   assertthat::assert_that(all(!duplicated(groups$Species)),
-                         msg = "Species names must be unique")
+                          msg = "Species names must be unique")
 
-  # Check size parameters
+  # Size parameters
   assertthat::assert_that(is.numeric(groups$W0),
-                         msg = "W0 (minimum weight) must be numeric")
-
+                          msg = "W0 (minimum weight) must be numeric")
   assertthat::assert_that(is.numeric(groups$Wmax),
-                         msg = "Wmax (maximum weight) must be numeric")
-
+                          msg = "Wmax (maximum weight) must be numeric")
   assertthat::assert_that(all(groups$W0 < groups$Wmax),
-                         msg = "W0 must be less than Wmax for all groups")
-
-  # Check reasonable size ranges (log10 weights)
+                          msg = "W0 must be less than Wmax for all groups")
   assertthat::assert_that(all(groups$W0 >= -15 & groups$W0 <= 5),
-                         msg = "W0 values should be between -15 and 5 (log10 grams)")
-
+                          msg = "W0 values should be between -15 and 5 (log10 grams)")
   assertthat::assert_that(all(groups$Wmax >= -10 & groups$Wmax <= 10),
-                         msg = "Wmax values should be between -10 and 10 (log10 grams)")
-
-  # Check maturation weight
+                          msg = "Wmax values should be between -10 and 10 (log10 grams)")
   assertthat::assert_that(all(groups$Wmat >= groups$W0 & groups$Wmat <= groups$Wmax),
-                         msg = "Wmat must be between W0 and Wmax")
+                          msg = "Wmat must be between W0 and Wmax")
 
-  # Check Type values
+  # Type and FeedType
   valid_types <- c("Zooplankton", "Fish")
   assertthat::assert_that(all(groups$Type %in% valid_types),
-                         msg = paste("Type must be one of:", paste(valid_types, collapse = ", ")))
+                          msg = paste("Type must be one of:", paste(valid_types, collapse = ", ")))
 
-  # Check FeedType values
   valid_feedtypes <- c("Carnivore", "Omnivore", "FilterFeeder", "Heterotroph")
   assertthat::assert_that(all(groups$FeedType %in% valid_feedtypes),
-                         msg = paste("FeedType must be one of:", paste(valid_feedtypes, collapse = ", ")))
+                          msg = paste("FeedType must be one of:", paste(valid_feedtypes, collapse = ", ")))
 
-  # Check biological parameters are positive where required
+  # Feeding parameters
   assertthat::assert_that(all(groups$SearchCoef > 0),
-                         msg = "SearchCoef must be positive")
-
+                          msg = "SearchCoef must be positive")
   assertthat::assert_that(all(groups$SearchExp > 0),
-                         msg = "SearchExp must be positive")
-
+                          msg = "SearchExp must be positive")
   assertthat::assert_that(all(groups$FeedWidth > 0),
-                         msg = "FeedWidth must be positive")
-
+                          msg = "FeedWidth must be positive")
   assertthat::assert_that(all(groups$Carbon > 0 & groups$Carbon <= 1),
-                         msg = "Carbon content must be between 0 and 1")
+                          msg = "Carbon content must be between 0 and 1")
 
-  # Check energy budget parameters
-  assertthat::assert_that(all(groups$def_high >= 0 & groups$def_high < 1),
-                         msg = "def_high must be between 0 and 1")
+  # GrossGEscale — required for all groups (used in colSums as prey property)
+  assertthat::assert_that(is.numeric(groups$GrossGEscale),
+                          msg = "GrossGEscale must be numeric")
+  assertthat::assert_that(all(!is.na(groups$GrossGEscale)),
+                          msg = "GrossGEscale must not be NA for any group (all groups contribute as prey to GGE-based growth)")
+  assertthat::assert_that(all(groups$GrossGEscale > 0),
+                          msg = "GrossGEscale must be positive for all groups")
 
-  assertthat::assert_that(all(groups$def_low >= 0 & groups$def_low < 1),
-                         msg = "def_low must be between 0 and 1")
-
-  assertthat::assert_that(all(groups$def_low >= groups$def_high),
-                         msg = "def_low must be >= def_high (low quality food = more defecation)")
-
-  assertthat::assert_that(all(groups$f_M >= 0 & groups$f_M < 1),
-                         msg = "f_M (metabolic fraction) must be between 0 and 1")
-
-  assertthat::assert_that(all(groups$K_growth > 0 & groups$K_growth <= 1),
-                         msg = "K_growth must be between 0 and 1")
-
-  # Check energy budget constraint: f_M + K_growth <= 1 (remainder is reproduction)
-  R_frac <- 1 - groups$f_M - groups$K_growth
-  assertthat::assert_that(all(R_frac >= 0),
-                         msg = "f_M + K_growth must be <= 1 (R_frac = 1 - f_M - K_growth must be >= 0)")
-
-  # Check reproduction parameters
-  assertthat::assert_that(all(groups$repro_eff >= 0 & groups$repro_eff <= 1),
-                         msg = "repro_eff must be between 0 and 1")
-
-  assertthat::assert_that(all(groups$repro_on %in% c(0, 1)),
-                         msg = "repro_on must be 0 or 1")
-
-  # Check that fish with reproduction enabled have positive reproductive efficiency
-  fish_repro_on <- groups$repro_on == 1
-  if (any(fish_repro_on)) {
-    assertthat::assert_that(all(groups$repro_eff[fish_repro_on] > 0),
-                           msg = "repro_eff must be > 0 for groups with repro_on = 1 (otherwise recruitment will be zero)")
-  }
-
-  # Check that repro_on is only enabled for fish (zooplankton must have repro_on = 0)
-  zoo_mask <- groups$Type == "Zooplankton"
-  assertthat::assert_that(all(groups$repro_on[zoo_mask] == 0),
-                         msg = "repro_on must be 0 for zooplankton groups (reproduction only implemented for fish)")
-
-  assertthat::assert_that(all(groups$mat_ogive_slope > 0),
-                         msg = "mat_ogive_slope must be positive")
-
-  # Check senescence parameters
+  # Senescence
   assertthat::assert_that(all(groups$ZSpre >= 0),
                           msg = "ZSpre (senescence prefactor) must be non-negative")
-
   assertthat::assert_that(all(groups$ZSexp > 0 & groups$ZSexp <= 2),
                           msg = "ZSexp (senescence exponent) must be between 0 and 2")
 
-  # Check fishing mortality is non-negative
+  # Fishing mortality
   assertthat::assert_that(all(groups$Fmort >= 0),
-                         msg = "Fmort (fishing mortality) must be non-negative")
+                          msg = "Fmort (fishing mortality) must be non-negative")
 
-  # Check catchability coefficient (optional — required only when effort data is provided)
+  # --- Zooplankton-specific checks ---
+  zoo_mask <- groups$Type == "Zooplankton"
+
+  # Zooplankton must NOT have reproduction enabled
+  assertthat::assert_that(all(groups$repro_on[zoo_mask] == 0),
+                          msg = "repro_on must be 0 for zooplankton groups (reproduction only implemented for fish)")
+
+  # --- Fish-specific: Energy budget pathway ---
+  fish_mask <- groups$Type == "Fish"
+
+  if (any(fish_mask)) {
+    # Energy budget fractions
+    assertthat::assert_that(all(groups$def_high[fish_mask] >= 0 & groups$def_high[fish_mask] < 1),
+                            msg = "def_high must be between 0 and 1 for fish groups")
+    assertthat::assert_that(all(groups$def_low[fish_mask] >= 0 & groups$def_low[fish_mask] < 1),
+                            msg = "def_low must be between 0 and 1 for fish groups")
+    assertthat::assert_that(all(groups$def_low[fish_mask] >= groups$def_high[fish_mask]),
+                            msg = "def_low must be >= def_high for fish groups")
+
+    assertthat::assert_that(all(groups$f_M[fish_mask] >= 0 & groups$f_M[fish_mask] < 1),
+                            msg = "f_M (metabolic fraction) must be between 0 and 1 for fish groups")
+    assertthat::assert_that(all(groups$K_growth[fish_mask] > 0 & groups$K_growth[fish_mask] <= 1),
+                            msg = "K_growth must be between 0 and 1 for fish groups")
+
+    # Energy budget closure: f_M + K_growth <= 1
+    R_frac_fish <- 1 - groups$f_M[fish_mask] - groups$K_growth[fish_mask]
+    assertthat::assert_that(all(R_frac_fish >= 0),
+                            msg = "f_M + K_growth must be <= 1 for fish groups (R_frac must be >= 0)")
+
+    # Reproduction parameters
+    assertthat::assert_that(all(groups$repro_eff[fish_mask] >= 0 & groups$repro_eff[fish_mask] <= 1),
+                            msg = "repro_eff must be between 0 and 1 for fish groups")
+    assertthat::assert_that(all(groups$repro_on[fish_mask] %in% c(0, 1)),
+                            msg = "repro_on must be 0 or 1 for fish groups")
+
+    # Fish with repro enabled must have positive repro_eff
+    fish_repro_on <- groups$repro_on[fish_mask] == 1
+    if (any(fish_repro_on)) {
+      assertthat::assert_that(all(groups$repro_eff[fish_mask][fish_repro_on] > 0),
+                              msg = "repro_eff must be > 0 for fish with repro_on = 1")
+    }
+  }
+
+  assertthat::assert_that(all(groups$mat_ogive_slope > 0),
+                          msg = "mat_ogive_slope must be positive")
+
+  # Catchability (optional)
   if ("q" %in% names(groups)) {
     assertthat::assert_that(is.numeric(groups$q),
-                           msg = "q (catchability) must be numeric")
+                            msg = "q (catchability) must be numeric")
     assertthat::assert_that(all(groups$q >= 0),
-                           msg = "q (catchability) must be non-negative")
+                            msg = "q (catchability) must be non-negative")
   }
 
   message("Functional groups validation passed")

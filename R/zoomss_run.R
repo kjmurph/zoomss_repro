@@ -80,10 +80,11 @@ zoomss_run <- function(model){
     fish_mort_dynamic <- matrix(0, nrow = ngrps, ncol = ngrid)  # working matrix
   }
 
-  # Extract energy budget parameters
-  assim_by_prey <- model$assim_by_prey  # Pre-calculated: (1 - def) by predator-prey pair
-  K_growth <- model$K_growth            # Growth fraction of assimilated
-  R_frac <- model$R_frac                # Reproduction fraction of assimilated
+  # Extract dual-pathway parameters
+  assim_eff_gge <- model$assim_eff_gge  # GGE*Carbon matrix for zoo pathway (ngrps x ngrid)
+  assim_by_prey <- model$assim_by_prey  # (1 - def) by pred-prey pair, fish only
+  K_growth <- model$K_growth            # Growth fraction of assimilated (fish only)
+  R_frac <- model$R_frac                # Reproduction fraction (0 for zoo, >0 for fish)
   mat_ogive <- model$mat_ogive          # Maturity ogive (ngrps x ngrid)
   repro_on <- model$repro_on            # Reproduction enabled flag
   repro_eff <- model$repro_eff          # Reproductive efficiency
@@ -175,10 +176,11 @@ zoomss_run <- function(model){
     }
 
     # ==========================================================================
-    # PHYTOPLANKTON FEEDING (pre-multiplied with assim_phyto in setup)
+    # PHYTOPLANKTON FEEDING
     # ==========================================================================
-    # These kernels incorporate (1 - def_phyto) assimilation.
-    # K_growth partitioning is applied post-hoc after gg is computed.
+    # Phyto kernels are pre-multiplied in setup with per-group assimilation:
+    #   Zoo groups: GrossGEscale * cc_phyto (final GGE, no further partitioning)
+    #   Fish groups: (1 - def_phyto) (pure assimilation, K_growth applied below)
     current_ingested_phyto <- model$temp_eff*(rowSums(sweep(model$phyto_growthkernel, 3, model$nPP, "*"), dims = 2))
     current_diff_phyto <- model$temp_eff^2*(rowSums(sweep(model$phyto_diffkernel, 3, model$nPP, "*"), dims = 2))
 
@@ -186,87 +188,81 @@ zoomss_run <- function(model){
     model$M_sb <- model$M_sb_base * model$temp_eff
 
     # ==========================================================================
-    # DYNAMIC SPECTRUM FEEDING WITH EXPLICIT ENERGY BUDGET
+    # GROWTH FROM DYNAMIC SPECTRUM — DUAL PATHWAY
     # ==========================================================================
-    # Calculate growth from dynamic spectrum with prey-specific defecation
-    # assim_by_prey[pred, prey] = (1 - def[pred,prey])  (pure assimilation only)
-    # K_growth partitioning is applied post-hoc after gg is computed.
 
-    # Growth multiplier now uses prey-specific assimilation efficiency
-    # For each predator, sum over all prey: N[prey] * assim_by_prey[pred, prey]
-    # This creates a matrix: rows = predators, cols = prey size classes
-    # Then sum over prey groups
+    # --- ZOOPLANKTON PATHWAY: Original GGE approach (vectorised) ---
+    # growth_multiplier[w] = sum_j N[j,w] * GrossGEscale[j] * Carbon[j]
+    # This is the prey-weighted growth efficiency summed over all prey groups.
+    growth_multiplier_gge <- colSums(N * assim_eff_gge)  # 1 x ngrid
 
-    growth_multiplier_by_prey <- matrix(0, nrow = ngrps, ncol = ngrid)
-    for (pred in 1:ngrps) {
-      # For this predator, calculate growth contribution from each prey group
-      for (prey in 1:ngrps) {
-        growth_multiplier_by_prey[pred, ] <- growth_multiplier_by_prey[pred, ] +
-          N[prey, ] * assim_by_prey[pred, prey]
+    # Apply temperature effects to growth kernel
+    temp_growth_kernel_3d <- sweep(dynam_growthkernel, c(1,2), model$temp_eff, '*')
+
+    # Vectorised kernel multiplication (computes growth for ALL predators using GGE)
+    temp_gk_2d <- temp_growth_kernel_3d
+    dim(temp_gk_2d) <- c(ngrps * ngrid, ngrid)
+    cs <- .colSums(growth_multiplier_gge * t(temp_gk_2d), m = ngrid, n = ngrps * ngrid)
+    dim(cs) <- c(ngrps, ngrid)
+
+    gg_dynam <- cs  # Growth from dynamic spectrum (GGE-based for all rows)
+
+    # --- FISH PATHWAY: Explicit energy budget (overwrite fish rows) ---
+    # For fish predators, replace with prey-specific defecation calculation.
+    # assim_by_prey[pred, prey] = (1 - def[pred, prey]) — pure assimilation.
+    if (num_fish > 0) {
+      for (f in 1:num_fish) {
+        fg <- fish_grps[f]
+
+        # Compute prey-weighted assimilation for this fish predator
+        fish_growth_mult <- numeric(ngrid)
+        for (prey in 1:ngrps) {
+          fish_growth_mult <- fish_growth_mult + N[prey, ] * assim_by_prey[fg, prey]
+        }
+
+        # Matrix-vector product: kernel[pred_size, prey_size] %*% growth_mult[prey_size]
+        gg_dynam[fg, ] <- as.vector(temp_growth_kernel_3d[fg, , ] %*% fish_growth_mult)
       }
     }
 
-    # Apply temperature effects and sum using growth kernels
-    temp_growth_kernel <- sweep(dynam_growthkernel, c(1,2), model$temp_eff, '*')
-
-    # Calculate growth from dynamic spectrum for each predator
-    gg_dynam <- matrix(0, nrow = ngrps, ncol = ngrid)
-    for (pred in 1:ngrps) {
-      for (prey in 1:ngrps) {
-        # Growth from this prey group
-        kernel_contribution <- temp_growth_kernel[pred, , ] %*%
-          (N[prey, ] * assim_by_prey[pred, prey] * dx)
-        gg_dynam[pred, ] <- gg_dynam[pred, ] + kernel_contribution
-      }
-    }
-
-    # Total growth = phytoplankton + dynamic spectrum
-    # gg here represents total ASSIMILATED energy rate (before K_growth partitioning)
+    # ==========================================================================
+    # TOTAL GROWTH — COMBINE PATHWAYS
+    # ==========================================================================
+    # For zooplankton: phyto (GGE-based) + dynamic (GGE-based) = FINAL growth rate
+    # For fish: phyto ((1-def)-based) + dynamic ((1-def)-based) = total ASSIMILATED energy
     gg <- current_ingested_phyto + gg_dynam
 
     # ==========================================================================
-    # PREDATOR-SIDE ENERGY PARTITIONING
+    # FISH ENERGY PARTITIONING
     # ==========================================================================
-    # gg contains total assimilated energy per group per size bin.
-    # Partition into: somatic growth (K_growth), reproduction (R_frac),
-    # and metabolic loss (f_M, implicit — not tracked).
+    # For fish only: partition assimilated energy into K_growth and R_frac.
+    # Zooplankton gg values are ALREADY the final growth rate — no partitioning.
 
-    gg_total <- gg   # Store total assimilated energy for reproduction calculation
+    gg_total <- gg  # Store total assimilated (needed for fish reproduction)
 
-    # Apply K_growth partitioning: somatic growth only
-    gg <- sweep(gg_total, 1, K_growth, '*')
-
-    # ==========================================================================
-    # REPRODUCTION CALCULATION (Fish only)
-    # ==========================================================================
-    # For fish with repro_on = 1:
-    # - Mature individuals (mat_ogive ~ 1): R_frac energy goes to reproduction
-    # - repro_rate feeds into SSB-based recruitment
-
+    # Reproduction rate (fish only)
     repro_rate <- matrix(0, nrow = ngrps, ncol = ngrid)
 
-    for (f in 1:num_fish) {
-      fg <- fish_grps[f]
-      if (repro_on[fg] == 1 && R_frac[fg] > 0) {
-        # Reproductive rate: R_frac portion of assimilated energy, scaled by maturity
-        repro_rate[fg, ] <- R_frac[fg] * gg_total[fg, ] * mat_ogive[fg, ]
+    if (num_fish > 0) {
+      for (f in 1:num_fish) {
+        fg <- fish_grps[f]
+
+        if (repro_on[fg] == 1 && R_frac[fg] > 0) {
+          # Reproductive rate: R_frac portion of assimilated energy, scaled by maturity
+          repro_rate[fg, ] <- R_frac[fg] * gg_total[fg, ] * mat_ogive[fg, ]
+        }
+
+        # Maturity-dependent growth for fish:
+        # Below Wmat (mat_ogive ~ 0): R_frac redirected to somatic growth
+        # Above Wmat (mat_ogive ~ 1): R_frac goes to reproduction
+        # gg_fish = K_growth * gg_total + R_frac * gg_total * (1 - mat_ogive)
+        gg[fg, ] <- K_growth[fg] * gg_total[fg, ] +
+          R_frac[fg] * gg_total[fg, ] * (1 - mat_ogive[fg, ])
       }
     }
-
-    # ==========================================================================
-    # MATURITY-DEPENDENT GROWTH ADJUSTMENT (all groups with R_frac > 0)
-    # ==========================================================================
-    # Below maturation size (mat_ogive ~ 0): R_frac energy redirected to somatic growth
-    # Above maturation size (mat_ogive ~ 1): R_frac energy lost from system (zooplankton)
-    #   or allocated to reproduction (fish, via repro_rate above)
-    # gg_adjusted = K_growth * gg_total + R_frac * gg_total * (1 - mat_ogive)
-
-    for (g in 1:ngrps) {
-      if (R_frac[g] > 0) {
-        gg[g, ] <- K_growth[g] * gg_total[g, ] +
-                   R_frac[g] * gg_total[g, ] * (1 - mat_ogive[g, ])
-      }
-    }
+    # After this block:
+    #   gg[zoo_grps, ] = GGE-based growth rate (unchanged, final)
+    #   gg[fish_grps, ] = energy-budget-partitioned growth rate
 
     # ==========================================================================
     # MORTALITY
@@ -294,52 +290,52 @@ zoomss_run <- function(model){
     rm(sw2, ap2)
 
     # ==========================================================================
-    # DIFFUSION
+    # DIFFUSION — DUAL PATHWAY
     # ==========================================================================
-    # Diffusion multiplier with prey-specific assimilation (squared)
-    diffusion_multiplier_by_prey <- matrix(0, nrow = ngrps, ncol = ngrid)
-    for (pred in 1:ngrps) {
-      for (prey in 1:ngrps) {
-        diffusion_multiplier_by_prey[pred, ] <- diffusion_multiplier_by_prey[pred, ] +
-          N[prey, ] * (assim_by_prey[pred, prey]^2)
-      }
-    }
 
-    temp_diff_kernel <- sweep(dynam_diffkernel, c(1,2), model$temp_eff^2, '*')
+    # --- ZOOPLANKTON PATHWAY: Original GGE approach (vectorised) ---
+    diffusion_multiplier_gge <- colSums(N * (assim_eff_gge^2))  # 1 x ngrid
 
-    diff_dynam <- matrix(0, nrow = ngrps, ncol = ngrid)
-    for (pred in 1:ngrps) {
-      for (prey in 1:ngrps) {
-        kernel_contribution <- temp_diff_kernel[pred, , ] %*%
-          (N[prey, ] * (assim_by_prey[pred, prey]^2) * dx)
-        diff_dynam[pred, ] <- diff_dynam[pred, ] + kernel_contribution
+    temp_diff_kernel_3d <- sweep(dynam_diffkernel, c(1,2), model$temp_eff^2, '*')
+
+    temp_dk_2d <- temp_diff_kernel_3d
+    dim(temp_dk_2d) <- c(ngrps * ngrid, ngrid)
+    cs_diff <- .colSums(diffusion_multiplier_gge * t(temp_dk_2d), m = ngrid, n = ngrps * ngrid)
+    dim(cs_diff) <- c(ngrps, ngrid)
+
+    diff_dynam <- cs_diff  # Diffusion from dynamic spectrum (GGE-based for all rows)
+
+    # --- FISH PATHWAY: Overwrite fish rows ---
+    if (num_fish > 0) {
+      for (f in 1:num_fish) {
+        fg <- fish_grps[f]
+
+        fish_diff_mult <- numeric(ngrid)
+        for (prey in 1:ngrps) {
+          fish_diff_mult <- fish_diff_mult + N[prey, ] * (assim_by_prey[fg, prey]^2)
+        }
+
+        diff_dynam[fg, ] <- as.vector(temp_diff_kernel_3d[fg, , ] %*% fish_diff_mult)
       }
     }
 
     diff <- current_diff_phyto + diff_dynam
 
     # ==========================================================================
-    # DIFFUSION PARTITIONING
+    # FISH DIFFUSION PARTITIONING
     # ==========================================================================
-    # Diffusion scales as growth^2 in the MvF-D framework.
-    # For groups with R_frac > 0, the effective growth fraction is size-dependent:
+    # For zooplankton: diffusion is already based on GGE^2 — no further scaling.
+    # For fish: diffusion must scale with effective growth fraction squared.
     #   eff_K = K_growth + R_frac * (1 - mat_ogive)
-    # (immature individuals redirect R_frac to growth, so eff_K > K_growth)
-    # Diffusion must use eff_K^2 to remain consistent with the actual growth rate.
+    #   (immature fish redirect R_frac to growth, so eff_K > K_growth)
 
-    # Start with K_growth^2 for all groups (correct for groups with R_frac = 0)
-    eff_K_sq <- matrix(rep(K_growth^2, each = ngrid), nrow = ngrps, ncol = ngrid, byrow = TRUE)
-
-    # Adjust for all groups with R_frac > 0: use size-dependent effective growth fraction
-    for (g in 1:ngrps) {
-      if (R_frac[g] > 0) {
-        eff_K <- K_growth[g] + R_frac[g] * (1 - mat_ogive[g, ])
-        eff_K_sq[g, ] <- eff_K^2
+    if (num_fish > 0) {
+      for (f in 1:num_fish) {
+        fg <- fish_grps[f]
+        eff_K <- K_growth[fg] + R_frac[fg] * (1 - mat_ogive[fg, ])
+        diff[fg, ] <- diff[fg, ] * (eff_K^2)
       }
     }
-
-    # Apply size-dependent diffusion scaling
-    diff <- diff * eff_K_sq
 
     # ==========================================================================
     # McKendrick-von Foerster NUMERICAL SOLUTION

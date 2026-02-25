@@ -20,9 +20,11 @@
 #'   \item{PPMRscale}{Numeric. Predator-prey mass ratio scaling parameter}
 #'   \item{PPMR}{Numeric. Predator-prey mass ratio (for fish groups)}
 #'   \item{FeedWidth}{Numeric. Feeding kernel width parameter}
-#'   \item{GrossGEscale}{Numeric. Gross growth efficiency scaling factor for zooplankton
-#'     growth pathway. Used as: E_ij = GrossGEscale * Carbon_prey. NA for fish groups
-#'     (which use the explicit energy budget instead).}
+#'   \item{GrossGEscale}{Numeric. Gross growth efficiency scaling factor.
+#'     Used in the zooplankton growth pathway as: E_ij = GrossGEscale * Carbon_prey.
+#'     Fish groups also require valid values (typically 2.5) because all groups
+#'     contribute as prey to the GGE-based growth calculation via colSums.
+#'     Fish predator growth is computed via the explicit energy budget instead.}
 #'   \item{Carbon}{Numeric. Carbon content (g C / g wet weight) of the group when consumed as prey}
 #'   \item{def_high}{Numeric. Defecation fraction for high-quality (high Carbon) prey (fish energy budget only)}
 #'   \item{def_low}{Numeric. Defecation fraction for low-quality (low Carbon) prey (fish energy budget only)}
