@@ -6,7 +6,7 @@
 #'   These represent various taxa from flagellates to large fish, each defined
 #'   by their feeding behavior, size ranges, and physiological parameters.
 #'
-#' @format A data frame with 12 rows (functional groups) and 24 columns:
+#' @format A data frame with 12 rows (functional groups) and 25+ columns:
 #' \describe{
 #'   \item{Species}{Character. Name of the functional group/taxa}
 #'   \item{Type}{Character. Broad category (Zooplankton or Fish)}
@@ -20,11 +20,14 @@
 #'   \item{PPMRscale}{Numeric. Predator-prey mass ratio scaling parameter}
 #'   \item{PPMR}{Numeric. Predator-prey mass ratio (for fish groups)}
 #'   \item{FeedWidth}{Numeric. Feeding kernel width parameter}
+#'   \item{GrossGEscale}{Numeric. Gross growth efficiency scaling factor for zooplankton
+#'     growth pathway. Used as: E_ij = GrossGEscale * Carbon_prey. NA for fish groups
+#'     (which use the explicit energy budget instead).}
 #'   \item{Carbon}{Numeric. Carbon content (g C / g wet weight) of the group when consumed as prey}
-#'   \item{def_high}{Numeric. Defecation fraction for high-quality (high Carbon) prey (typically 0.30)}
-#'   \item{def_low}{Numeric. Defecation fraction for low-quality (low Carbon) prey (typically 0.95, reflecting high water content of gelatinous prey)}
-#'   \item{f_M}{Numeric. Metabolic fraction of assimilated energy (typically 0.50)}
-#'   \item{K_growth}{Numeric. Growth fraction of assimilated energy (group-specific, 0.25--0.50)}
+#'   \item{def_high}{Numeric. Defecation fraction for high-quality (high Carbon) prey (fish energy budget only)}
+#'   \item{def_low}{Numeric. Defecation fraction for low-quality (low Carbon) prey (fish energy budget only)}
+#'   \item{f_M}{Numeric. Metabolic fraction of assimilated energy (fish energy budget only)}
+#'   \item{K_growth}{Numeric. Growth fraction of assimilated energy (fish energy budget only)}
 #'   \item{repro_eff}{Numeric. Reproductive efficiency - egg-to-recruit survival fraction (fish only)}
 #'   \item{repro_on}{Integer. Flag to enable reproduction (0 = off, 1 = on; fish only)}
 #'   \item{mat_ogive_slope}{Numeric. Steepness of maturity ogive function (typically 10)}
@@ -39,23 +42,13 @@
 #' @details The GroupInputs dataset defines 12 functional groups spanning from
 #'   small microzooplankton (flagellates, ciliates) through various mesozooplankton
 #'   groups (copepods, euphausiids, chaetognaths) to gelatinous zooplankton (salps, jellyfish)
-#'   and three fish size classes (small, medium, large). Each group is characterized by:
+#'   and three fish size classes (small, medium, large).
 #'
-#'   - **Size ranges**: W0 to Wmax define the body size spectrum
-#'   - **Feeding behavior**: Different strategies for resource acquisition
-#'   - **Interaction parameters**: Search rates and predator-prey relationships
-#'   - **Energy budget parameters**: Defecation, metabolism, and growth fractions following DBPM theory
-#'   - **Reproduction parameters**: For fish groups, explicit reproduction with maturity ogive
-#'
-#'   The energy budget follows a two-stage partitioning:
-#'   1. Ingestion -> Defecation (D) + Assimilation (A = 1 - D)
-#'   2. Assimilation -> Metabolism (f_M) + Growth (K_growth) + Reproduction (R_frac = 1 - f_M - K_growth)
-#'
-#'   Defecation is calculated using continuous scaling based on prey Carbon content:
-#'   def_effective = def_high + (def_low - def_high) * (1 - Carbon_prey / Carbon_max)
-#'
-#'   These parameters are based on marine ecological literature, DBPM theory,
-#'   and represent typical values for temperate marine ecosystems.
+#'   **Dual growth pathway:**
+#'   - Zooplankton use the original GGE approach: growth efficiency = GrossGEscale × Carbon_prey
+#'   - Fish use an explicit energy budget following DBPM theory:
+#'     1. Ingestion -> Defecation (D) + Assimilation (A = 1 - D)
+#'     2. Assimilation -> Metabolism (f_M) + Growth (K_growth) + Reproduction (R_frac)
 #'
 #' @source Marine ecological literature, DBPM (Blanchard et al.), and ZooMSS model development
 #' @family ZooMSS-data
