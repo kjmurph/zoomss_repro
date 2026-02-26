@@ -40,8 +40,12 @@ ZooMSS requires two sets of input data:
 
 Get the default published `Groups` dataframe using:
 
+
 ```{r}
 Groups <- getGroups()
+
+# Check the change
+Groups[Groups$Type == "Fish", c("Species", "Type", "repro_on","repro_eff")]
 ```
 
 Now create an environmental data time-series using the helper function. This time-series uses a constant sea surface temperature (`sst`) and chlorophyll *a*  (`chl`) with a 0.1 yr-1 timestep (`dt`). 
@@ -49,7 +53,7 @@ Now create an environmental data time-series using the helper function. This tim
 ```{r}
 env_data <- createInputParams(time = seq(0, 100, by = 0.1) ,
                               sst = 15,
-                              chl = 0.15)
+                              chl = 0.1)
 
 ```
 
@@ -72,6 +76,18 @@ The model includes several built-in plotting functions for analysis and visualiz
 
 
 ### Time Series Analysis
+
+```{r}
+library(patchwork)
+
+p_biomass <- plotTimeSeries(mdl, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+
+p_fill <- plotTimeSeries(mdl, by = "biomass", type = "fill") 
+
+wrap_plots(p_biomass, p_fill, nrow = 2, guides = "collect")
+```
+
 
 These plots display total abundance and mean growth/mortality across all size classes through time.
 
