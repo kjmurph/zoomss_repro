@@ -668,7 +668,7 @@ plotDefecation <- function(mdl) {
                                                 colour = .data$species)) +
     ggplot2::geom_point(size = 4) +
     ggplot2::geom_line(ggplot2::aes(group = 1), colour = "grey50", linetype = "dashed") +
-    ggplot2::geom_text(ggplot2::aes(label = .data$species), hjust = -0.1, vjust = 0.5, size = 3) +
+    ggrepel::geom_text_repel(ggplot2::aes(label = .data$species), size = 3, max.overlaps = 20) +
     ggplot2::scale_colour_manual(values = plot_colours) +
     ggplot2::theme_bw() +
     ggplot2::theme(legend.position = "none") +
@@ -805,7 +805,7 @@ plotAssimilationMatrix <- function(mdl) {
 
   # Order prey by Carbon content (low to high)
   prey_order <- species[order(carbon)]
-  
+
   # Order predators by type (Zooplankton first, then Fish) and Carbon within type
   pred_order <- species[order(group_type, carbon)]
 
