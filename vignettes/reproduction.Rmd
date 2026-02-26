@@ -28,11 +28,13 @@ knitr::opts_chunk$set(
 ```
 
 ```{r message=FALSE, warning=FALSE}
-library(zoomss)
+devtools::load_all()
 library(ggplot2)
 library(patchwork)
 library(dplyr)
 library(tidyr)
+library(kableExtra)
+library(ggrepel)
 ```
 
 ```{r cache-setup}
@@ -132,6 +134,8 @@ For immature fish (below maturation size $W_{\text{mat}}$), $R_{\text{frac}}$ en
 
 The zooplankton GGE approach has been extensively validated against observed community composition across environmental gradients (Heneghan et al. 2016, 2020). Implementing the explicit energy budget for zooplankton altered community composition in ways that required additional calibration without clear benefit. The explicit energy budget is needed for fish because it enables mechanistic reproduction — energy partitioning into growth vs. reproduction is essential for modelling fish population dynamics under changing environmental and fishing pressure.
 
+Note the dual-pathway distinction: zooplankton growth is driven entirely by `GrossGEscale × Carbon`. For fish, the allocation depends on maturity: **immature fish** redirect $R_{\text{frac}}$ to somatic growth, while **mature fish** split production between growth ($K_{\text{growth}}$) and reproduction ($R_{\text{frac}}$).
+
 ## Model Setup
 
 Let's load the default groups and examine the parameters for both pathways:
@@ -154,6 +158,35 @@ print(fish_params)
 # Calculate R_frac for fish
 cat("\nFish R_frac = 1 - f_M - K_growth =",
     1 - fish_params$f_M[1] - fish_params$K_growth[1], "\n")
+```
+
+```markdown
+### Functional Group Parameters
+
+The following parameters are constant across all groups: search coefficient (640),
+search exponent (0.8), GrossGEscale (2.5), defecation bounds (D_high = 0.30,
+D_low = 0.95), and maturity ogive slope (10). The table below shows the parameters
+that vary by group.
+```
+
+```{r}
+# Key parameters that vary across groups
+key_params <- Groups[, c("Species", "Type", "FeedType", "W0", "Wmax", "Wmat",
+                          "PPMRscale", "PPMR", "FeedWidth", "Carbon",
+                          "f_M", "K_growth", "repro_eff", "repro_on",
+                          "ZSpre", "ZSexp")]
+
+knitr::kable(key_params,
+  col.names = c("Species", "Type", "Feed Type",
+                "W0", "Wmax", "Wmat",
+                "PPMR scale", "PPMR", "Feed Width", "Carbon",
+                "f_M", "K_growth", "repro_eff", "repro_on",
+                "ZSpre", "ZSexp"),
+  digits = 3,
+  caption = "Key parameters for ZooMSS functional groups. Size parameters (W0, Wmax, Wmat) are log10 grams wet weight. Carbon is g C / g WW. Energy budget parameters (f_M, K_growth, repro_eff) are only used for fish groups in the dual-pathway model; zooplankton growth is governed by GrossGEscale × Carbon_prey."
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            font_size = 11, full_width = FALSE)
 ```
 
 Notice that:
@@ -183,19 +216,6 @@ plotEnvironment(env_constant)
 mdl_constant <- run_or_load("mdl_constant_300yr", env_constant, Groups, isave = 2, cache_dir = cache_dir)
 ```
 
-### Visualizing the Energy Budget
-
-Before examining the model dynamics, let's visualize the energy budget structure.
-
-#### Energy Budget Allocation
-
-This plot shows how assimilated energy is partitioned into metabolism, growth, and reproduction for each functional group:
-
-```{r fig.height=5}
-plotEnergyBudget(mdl_constant)
-```
-
-Note the dual-pathway distinction: zooplankton use GGE-based growth (the K_growth and f_M values shown are from their GroupInputs columns but are not used in growth calculations — zooplankton growth is driven entirely by `GrossGEscale × Carbon`). For fish, the allocation depends on maturity: **immature fish** redirect $R_{\text{frac}}$ to somatic growth, while **mature fish** split production between growth ($K_{\text{growth}}$) and reproduction ($R_{\text{frac}}$).
 
 #### Defecation by Prey Quality (Fish Pathway)
 
@@ -203,6 +223,8 @@ This plot shows how the defecation fraction experienced by fish varies depending
 
 ```{r fig.height=5}
 plotDefecation(mdl_constant)
+
+geom_text_repel(aes(label = Species), size = 3, max.overlaps = 20)
 ```
 
 When a fish predator consumes high-Carbon prey (e.g. ciliates at 0.15 g C/g WW), a larger proportion of the ingested material is nutritionally useful, resulting in low defecation (~30%). Conversely, when consuming low-Carbon prey such as gelatinous organisms (e.g. jellyfish at 0.005 g C/g WW), the high water content means most of the ingested material passes through as waste, resulting in high defecation (~95%). Note: zooplankton growth does not use this defecation pathway — their growth efficiency is determined by `GrossGEscale × Carbon_prey`.
@@ -441,8 +463,6 @@ env_seasonal_params <- createInputParams(
   chl = env_seasonal$chl
 )
 
-# Plot the seasonal environment
-plotEnvironment(env_seasonal_params)
 ```
 
 ```{r}
@@ -470,25 +490,32 @@ p_seas <- plotTimeSeries(mdl_seasonal, by = "biomass",
 # Show the seasonal forcing for context
 p_env <- plotEnvironment(env_seasonal_params) & xlim(200, 300)
 
-wrap_plots(p_const, p_seas, p_env, ncol = 1, heights = c(1, 1, 1))
+wrap_plots(p_env, p_const, p_seas, ncol = 1, heights = c(1, 1, 1))
 ```
 
 ### Comparing Constant vs Seasonal: Reproduction
 
 ```{r fig.height=9}
 # SSB comparison
+# Get shared y-axis ranges
+ssb_range <- range(c(mdl_constant$SSB[start_idx:n_save, ],
+                     mdl_seasonal$SSB[start_idx:n_save, ]), na.rm = TRUE)
+rec_range <- range(c(mdl_constant$recruitment[start_idx:n_save, ],
+                     mdl_seasonal$recruitment[start_idx:n_save, ]), na.rm = TRUE)
+
+# SSB comparison
 p_ssb_const <- plotReproduction(mdl_constant, by = "SSB") +
-  ggtitle("Constant - SSB") + xlim(200, 300)
+  ggtitle("Constant - SSB") + xlim(200, 300) + ylim(ssb_range)
 
 p_ssb_seas <- plotReproduction(mdl_seasonal, by = "SSB") +
-  ggtitle("Seasonal - SSB") + xlim(200, 300)
+  ggtitle("Seasonal - SSB") + xlim(200, 300) + ylim(ssb_range)
 
 # Recruitment comparison
 p_rec_const <- plotReproduction(mdl_constant, by = "recruitment") +
-  ggtitle("Constant - Recruitment") + xlim(200, 300)
+  ggtitle("Constant - Recruitment") + xlim(200, 300) + ylim(rec_range)
 
 p_rec_seas <- plotReproduction(mdl_seasonal, by = "recruitment") +
-  ggtitle("Seasonal - Recruitment") + xlim(200, 300)
+  ggtitle("Seasonal - Recruitment") + xlim(200, 300) + ylim(rec_range)
 
 wrap_plots(p_ssb_const, p_ssb_seas, p_rec_const, p_rec_seas,
            ncol = 2, guides = "collect")
@@ -496,7 +523,7 @@ wrap_plots(p_ssb_const, p_ssb_seas, p_rec_const, p_rec_seas,
 
 ### Stock-Recruitment: Constant vs Seasonal
 
-```{r fig.height=8}
+```{r fig.height=6, fig.width=8}
 # Build S-R data for both scenarios
 build_sr_data <- function(mdl, scenario_name, n_years_avg = 100) {
   fish_grps <- mdl$param$fish_grps
@@ -526,7 +553,7 @@ sr_combined <- rbind(sr_const, sr_seas)
 
 ggplot(sr_combined %>% filter(SSB > 0 & Recruitment > 0),
        aes(x = SSB, y = Recruitment, colour = Scenario)) +
-  geom_point(alpha = 0.2, size = 0.8) +
+  geom_point(alpha = 0.3, size = 1) +
   facet_wrap(~Fish_Group, scales = "free") +
   scale_colour_manual(values = c("Constant" = "grey40", "Seasonal" = "coral")) +
   theme_bw() +
@@ -656,7 +683,7 @@ wrap_plots(p_biomass, p_ssb, p_recruit, ncol = 1, guides = "collect")
 
 ### Stock-Recruitment Across the Chlorophyll Gradient
 
-```{r fig.height=12, fig.width=6}
+```{r fig.height=12, fig.width=8}
 # Build S-R data across chlorophyll gradient at 15°C
 sr_chl_data <- data.frame()
 for (i in seq_along(chl_levels)) {
@@ -668,7 +695,7 @@ for (i in seq_along(chl_levels)) {
 
 ggplot(sr_chl_data %>% filter(SSB > 0 & Recruitment > 0),
        aes(x = SSB, y = Recruitment, colour = log10(chl))) +
-  geom_point(alpha = 0.3, size = 0.8) +
+  geom_point(alpha = 0.3, size = 1) +
   facet_wrap(~Fish_Group, scales = "free", ncol = 1) +
   scale_colour_viridis_c(option = "viridis",
                          name = expression(log[10] * "(Chl " * italic(a) * ")")) +
@@ -683,7 +710,7 @@ ggplot(sr_chl_data %>% filter(SSB > 0 & Recruitment > 0),
 
 Let's examine how community composition changes across the productivity gradient. Following Heneghan et al., we split the lower trophic levels into two panels: (1) phytoplankton size classes with flagellates and ciliates, and (2) the remaining zooplankton groups.
 
-```{r fig.height=14}
+```{r fig.height=6, fig.width=8}
 # ============================================================================
 # HELPER: Extract community composition with phytoplankton size classes
 # ============================================================================
@@ -758,30 +785,36 @@ plot_split_community <- function(results_list, chl_levels, Groups,
     filter(species %in% c("Flagellates", "Ciliates"))
   upper_data <- rbind(comp$phyto, flag_cil)
   upper_data$species <- factor(upper_data$species, levels = upper_groups)
+  
+  # Clamp negative biomass before computing proportions
+  upper_data$biomass <- pmax(0, upper_data$biomass)
 
   # Calculate proportions within upper panel
   upper_data <- upper_data %>%
     group_by(chl) %>%
     mutate(proportion = biomass / sum(biomass, na.rm = TRUE)) %>%
     ungroup()
-
+  
   upper_colours <- c(phyto_colours,
-                     plot_colours[c("Flagellates", "Ciliates")])
-
+                   "Flagellates" = "#006d2c",
+                   "Ciliates"    = "#00441b")
+  
   p_upper <- ggplot(upper_data,
                     aes(x = log10(chl), y = proportion, fill = species)) +
-    geom_area(position = "stack") +
+    geom_area(position = "fill") +
+    # geom_area(position = "stack") +
     scale_fill_manual(values = upper_colours, name = "Species") +
     scale_y_continuous(expand = c(0, 0)) +
     scale_x_continuous(expand = c(0, 0)) +
+    coord_cartesian(xlim = c(-1.3, 0.5)) +
     theme_bw() +
     theme(axis.title.x = element_blank(),
           legend.position = "right") +
     labs(y = "Proportion")
 
   # ---- PANEL 2: Remaining zooplankton (no Flagellates, Ciliates, no Fish) ----
-  lower_groups <- c("OmniCopepods", "CarnCopepods", "Euphausiids",
-                    "Chaetognaths", "Salps", "Jellyfish", "Larvaceans")
+  lower_groups <- c("OmniCopepods", "Euphausiids", "Jellyfish", "Chaetognaths",
+                  "CarnCopepods", "Salps", "Larvaceans")
 
   lower_data <- comp$zoo_fish %>%
     filter(species %in% lower_groups)
@@ -801,6 +834,7 @@ plot_split_community <- function(results_list, chl_levels, Groups,
     scale_fill_manual(values = lower_colours, name = "Species") +
     scale_y_continuous(expand = c(0, 0)) +
     scale_x_continuous(expand = c(0, 0)) +
+    coord_cartesian(xlim = c(-1.3, 0.5)) +
     theme_bw() +
     theme(legend.position = "right") +
     labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
@@ -819,23 +853,263 @@ plot_split_community(results_chl[["15"]], chl_levels, Groups,
                      "15\u00B0C", n_years_avg = 100)
 ```
 
-```{r fig.height=14}
+```{r fig.height=6, fig.width=8}
 # ---- Plot community composition at 10°C ----
 plot_split_community(results_chl[["10"]], chl_levels, Groups,
                      "10\u00B0C", n_years_avg = 100)
 ```
 
-```{r fig.height=14}
+```{r fig.height=6, fig.width=8}
 # ---- Plot community composition at 20°C ----
 plot_split_community(results_chl[["20"]], chl_levels, Groups,
                      "20\u00B0C", n_years_avg = 100)
 ```
 
+
+```{r fig.height=10, fig.width=10}
+# ============================================================================
+# COEFFICIENT OF VARIATION ANALYSIS
+# ============================================================================
+# Temporal CV: how variable is biomass through time at each chl level?
+#
+# Gradient CV: how variable is mean biomass across the chl gradient?
+
+# Use 15°C results
+results_15 <- results_chl[["15"]]
+fish_grps <- results_15[[1]]$param$fish_grps
+zoo_grps <- which(Groups$Type == "Zooplankton")
+all_grps <- seq_len(nrow(Groups))
+
+# --------------------------------------------------------------------------
+# 1. Temporal CV at each chl level (final 100 years)
+# --------------------------------------------------------------------------
+temporal_cv <- data.frame()
+
+for (i in seq_along(chl_levels)) {
+  mdl <- results_15[[i]]
+  n_save <- length(mdl$time)
+  dt_save <- mdl$param$isave * mdl$param$dt
+  n_100yr <- min(n_save, round(100 / dt_save))
+  start_idx <- max(1, n_save - n_100yr + 1)
+
+  # Extract biomass time series (ngrps x ngrid saved at each time step)
+  # Total biomass per group at each saved time step
+  biomass_ts <- mdl$biomass[start_idx:n_save, , ]  # time x group x size
+
+  # Sum across size bins for each group at each time step
+  group_biomass_ts <- apply(biomass_ts, c(1, 2), sum)  # time x group
+
+  # Fish by group
+  for (f in seq_along(fish_grps)) {
+    fg <- fish_grps[f]
+    ts <- group_biomass_ts[, fg]
+    temporal_cv <- rbind(temporal_cv, data.frame(
+      chl = chl_levels[i],
+      category = "Fish (by group)",
+      group = Groups$Species[fg],
+      cv = sd(ts, na.rm = TRUE) / mean(ts, na.rm = TRUE)
+    ))
+  }
+
+  # Fish total
+  fish_total_ts <- rowSums(group_biomass_ts[, fish_grps, drop = FALSE])
+  temporal_cv <- rbind(temporal_cv, data.frame(
+    chl = chl_levels[i],
+    category = "Fish (total)",
+    group = "All Fish",
+    cv = sd(fish_total_ts, na.rm = TRUE) / mean(fish_total_ts, na.rm = TRUE)
+  ))
+
+  # Zoo by group
+  for (z in zoo_grps) {
+    ts <- group_biomass_ts[, z]
+    temporal_cv <- rbind(temporal_cv, data.frame(
+      chl = chl_levels[i],
+      category = "Zooplankton (by group)",
+      group = Groups$Species[z],
+      cv = sd(ts, na.rm = TRUE) / mean(ts, na.rm = TRUE)
+    ))
+  }
+
+  # Zoo total
+  zoo_total_ts <- rowSums(group_biomass_ts[, zoo_grps, drop = FALSE])
+  temporal_cv <- rbind(temporal_cv, data.frame(
+    chl = chl_levels[i],
+    category = "Zooplankton (total)",
+    group = "All Zooplankton",
+    cv = sd(zoo_total_ts, na.rm = TRUE) / mean(zoo_total_ts, na.rm = TRUE)
+  ))
+
+  # Total community
+  community_ts <- rowSums(group_biomass_ts)
+  temporal_cv <- rbind(temporal_cv, data.frame(
+    chl = chl_levels[i],
+    category = "Total community",
+    group = "All Groups",
+    cv = sd(community_ts, na.rm = TRUE) / mean(community_ts, na.rm = TRUE)
+  ))
+}
+
+# Handle NaN/Inf from zero-biomass groups
+temporal_cv$cv[!is.finite(temporal_cv$cv)] <- NA
+
+# --------------------------------------------------------------------------
+# 2. Gradient CV (variability of mean biomass across chl levels)
+# --------------------------------------------------------------------------
+gradient_means <- data.frame()
+
+for (i in seq_along(chl_levels)) {
+  mdl <- results_15[[i]]
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+  total_biomass <- rowSums(avg_biomass)
+
+  for (g in all_grps) {
+    gradient_means <- rbind(gradient_means, data.frame(
+      chl = chl_levels[i],
+      group = Groups$Species[g],
+      type = Groups$Type[g],
+      biomass = total_biomass[g]
+    ))
+  }
+}
+
+gradient_cv <- gradient_means %>%
+  group_by(group, type) %>%
+  summarise(
+    mean_biomass = mean(biomass, na.rm = TRUE),
+    sd_biomass   = sd(biomass, na.rm = TRUE),
+    cv           = sd_biomass / mean_biomass,
+    .groups = "drop"
+  )
+
+# Add aggregate rows
+fish_agg <- gradient_means %>%
+  filter(type == "Fish") %>%
+  group_by(chl) %>%
+  summarise(biomass = sum(biomass), .groups = "drop") %>%
+  summarise(cv = sd(biomass) / mean(biomass)) %>%
+  mutate(group = "All Fish", type = "Fish (total)")
+
+zoo_agg <- gradient_means %>%
+  filter(type == "Zooplankton") %>%
+  group_by(chl) %>%
+  summarise(biomass = sum(biomass), .groups = "drop") %>%
+  summarise(cv = sd(biomass) / mean(biomass)) %>%
+  mutate(group = "All Zooplankton", type = "Zooplankton (total)")
+
+community_agg <- gradient_means %>%
+  group_by(chl) %>%
+  summarise(biomass = sum(biomass), .groups = "drop") %>%
+  summarise(cv = sd(biomass) / mean(biomass)) %>%
+  mutate(group = "All Groups", type = "Total community")
+
+gradient_cv_summary <- bind_rows(gradient_cv, fish_agg, zoo_agg, community_agg)
+
+# --------------------------------------------------------------------------
+# PLOTS
+# --------------------------------------------------------------------------
+
+# --- Temporal CV across chl gradient: aggregates ---
+p_temporal_agg <- temporal_cv %>%
+  filter(category %in% c("Fish (total)", "Zooplankton (total)", "Total community")) %>%
+  ggplot(aes(x = log10(chl), y = cv, colour = group)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
+       y = "Temporal CV",
+       title = "Temporal Coefficient of Variation Across Productivity Gradient",
+       subtitle = "CV of biomass time series (final 100 years) at 15°C",
+       colour = "Group")
+
+# --- Temporal CV: fish by group ---
+p_temporal_fish <- temporal_cv %>%
+  filter(category == "Fish (by group)") %>%
+  ggplot(aes(x = log10(chl), y = cv, colour = group)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_colour_manual(values = fish_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
+       y = "Temporal CV",
+       title = "Fish Temporal CV by Group",
+       colour = "Fish Group")
+
+# --- Temporal CV: zoo by group ---
+zoo_colours <- Groups$PlotColour[zoo_grps]
+names(zoo_colours) <- Groups$Species[zoo_grps]
+
+# Map FeedType to each zoo group
+zoo_feedtype <- setNames(Groups$FeedType[zoo_grps], Groups$Species[zoo_grps])
+
+feedtype_colours <- c(
+  "Heterotroph"  = "#1b9e77",
+  "Omnivore"     = "#7570b3",
+  "Carnivore"    = "#d95f02",
+  "FilterFeeder" = "#e7298a"
+)
+
+p_temporal_zoo <- temporal_cv %>%
+  filter(category == "Zooplankton (by group)") %>%
+  mutate(feed_type = zoo_feedtype[group]) %>%
+  ggplot(aes(x = log10(chl), y = cv, colour = feed_type, group = group)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.5) +
+  scale_colour_manual(values = feedtype_colours) +
+  theme_bw() +
+  labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
+       y = "Temporal CV",
+       title = "Zooplankton Temporal CV by Group",
+       subtitle = "Coloured by feeding type",
+       colour = "Feed Type")
+
+# p_temporal_zoo <- temporal_cv %>%
+#   filter(category == "Zooplankton (by group)") %>%
+#   ggplot(aes(x = log10(chl), y = cv, colour = group)) +
+#   geom_line(linewidth = 1) +
+#   geom_point(size = 1.5) +
+#   scale_colour_manual(values = zoo_colours) +
+#   theme_bw() +
+#   labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
+#        y = "Temporal CV",
+#        title = "Zooplankton Temporal CV by Group",
+#        colour = "Zoo Group")
+
+# --- Gradient CV: bar chart ---
+gradient_cv_summary$group <- factor(gradient_cv_summary$group,
+  levels = c(Groups$Species, "All Fish", "All Zooplankton", "All Groups"))
+
+
+# Build colour map: group-specific for individuals, custom for aggregates
+bar_colours <- c(
+  setNames(Groups$PlotColour, Groups$Species),
+  "All Fish"        = "grey40",
+  "All Zooplankton" = "grey60",
+  "All Groups"      = "grey80"
+)
+
+p_gradient <- ggplot(gradient_cv_summary,
+                     aes(x = group, y = cv, fill = group)) +
+  geom_col() +
+  scale_fill_manual(values = bar_colours) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none") +
+  labs(x = "Group", y = "Gradient CV",
+       title = "Gradient CV: Variability of Mean Biomass Across Chlorophyll Levels",
+       subtitle = "How much does each group's mean biomass change across productivity (15°C)")
+
+wrap_plots(p_temporal_agg, p_temporal_fish, p_temporal_zoo, p_gradient,
+           ncol = 2, guides = "collect")
+```
+
+The temporal CV tells you which groups oscillate most at a given productivity, while the gradient CV tells you which groups are most sensitive to productivity itself. Fish with weak recruitment will typically show high temporal CV (boom-bust cycles) and the gradient CV will highlight whether zooplankton or fish composition is more responsive to chlorophyll.
+
 ### Full Community Composition (Including Fish)
 
 For completeness, here is the full community composition including fish groups across the gradient at 15°C:
 
-```{r fig.height=10}
+```{r fig.height=8, fig.width=10}
 # Standard full community composition plot (all groups)
 all_species <- Groups$Species
 ngrps <- length(all_species)
@@ -872,6 +1146,7 @@ p_prop <- ggplot(biomass_full,
   scale_fill_manual(values = plot_colours) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_x_continuous(expand = c(0, 0)) +
+  coord_cartesian(xlim = c(-1.3, 0.5)) +
   theme_bw() +
   labs(x = expression("Chlorophyll " * italic(a) * " (log"[10] * "(mg m"^-3*"))"),
        y = "Proportion of Total Biomass",
@@ -898,10 +1173,10 @@ wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
 
 Explore how temperature affects fish reproduction through metabolic scaling. We run 300-year simulations at 1 mg m⁻³ chlorophyll across a temperature gradient.
 
-```{r}
+```{r fig.height=6, fig.width=10}
 # Load pre-computed models across temperature gradient
 # (5 models computed by run_gradient_models.R)
-sst_levels <- c(5, 10, 15, 20, 25)
+sst_levels <- c(5, 10, 15, 20)
 
 results_sst <- lapply(seq_along(sst_levels), function(i) {
   cache_name <- sprintf("mdl_sst%d_chl1_300yr", sst_levels[i])
@@ -1022,7 +1297,8 @@ for (i in seq_along(sst_levels)) {
 biomass_sst <- biomass_sst %>%
   group_by(sst) %>%
   mutate(proportion = biomass / sum(biomass, na.rm = TRUE)) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(proportion = replace(proportion, is.nan(proportion), 0))
 
 biomass_sst$species <- factor(biomass_sst$species, levels = all_species)
 
