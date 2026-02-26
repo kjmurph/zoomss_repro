@@ -1,5 +1,5 @@
 ---
-title: "Fish Reproduction and Energy Budget in ZooMSS"
+title: "Dual-Pathway Energy Budget and Fish Reproduction in ZooMSS"
 output:
   html_document:
     toc: true
@@ -10,7 +10,7 @@ output:
     code_folding: hide
     number_sections: false
 vignette: >
-  %\VignetteIndexEntry{Fish Reproduction and Energy Budget}
+  %\VignetteIndexEntry{Dual-Pathway Energy Budget and Fish Reproduction}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -39,7 +39,8 @@ library(tidyr)
 # ============================================================================
 # MODEL OUTPUT CACHING
 # ============================================================================
-# Long model runs (>100 years) are cached to avoid re-running on every knit.
+# Long model runs are cached to avoid re-running on every knit.
+# Pre-compute all models by running: source("vignettes/run_gradient_models.R")
 # Delete the cache directory to force re-runs.
 
 cache_dir <- here::here("vignettes", "cache")
@@ -54,7 +55,7 @@ if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
 #' @param cache_dir Path to cache directory (explicit for parallel safety)
 #' @param force_rerun Logical, if TRUE, re-run even if cache exists
 run_or_load <- function(cache_name, input_params, Groups, isave = 2,
-                        energy_budget_scenario = "A", cache_dir, force_rerun = FALSE) {
+                        cache_dir, force_rerun = FALSE) {
   cache_file <- file.path(cache_dir, paste0(cache_name, ".rds"))
   if (file.exists(cache_file) && !force_rerun) {
     message("Loading cached model: ", cache_name)
@@ -64,8 +65,7 @@ run_or_load <- function(cache_name, input_params, Groups, isave = 2,
   mdl <- zoomss_model(
     input_params = input_params,
     Groups = Groups,
-    isave = isave,
-    energy_budget_scenario = energy_budget_scenario
+    isave = isave
   )
   tmp_file <- tempfile(tmpdir = cache_dir, fileext = ".rds")
   saveRDS(mdl, tmp_file)
@@ -77,18 +77,35 @@ run_or_load <- function(cache_name, input_params, Groups, isave = 2,
 
 ## Introduction
 
-This vignette demonstrates the explicit energy budget and fish reproduction system in ZooMSS. The model now implements a DBPM-style (Dynamic Benthic-Pelagic Model) energy budget that explicitly tracks:
-- **Defecation**: Energy lost as faeces (varies with prey quality)
-- **Assimilation**: Energy absorbed through the gut wall
-- **Metabolism**: Energy spent on maintenance (f_M fraction)
-- **Growth**: Energy allocated to somatic growth (K_growth fraction)
-- **Reproduction**: Energy allocated to reproductive output (R_frac fraction)
+This vignette demonstrates the dual-pathway growth model and fish reproduction system in ZooMSS. The model uses two distinct growth pathways depending on organism type:
 
-For fish groups with `repro_on = 1`, reproductive investment drives population dynamics through explicit recruitment.
+- **Zooplankton** use the original gross growth efficiency (GGE) approach, where growth efficiency is a prey property: $E_{ij} = \text{GrossGEscale}_j \times C_j$
+- **Fish** use an explicit DBPM-style (Dynamic Benthic-Pelagic Model) energy budget that tracks defecation, assimilation, metabolism, growth, and reproduction
 
-## The Energy Budget Structure
+This dual-pathway design preserves the well-validated zooplankton community composition from the original ZooMSS while enabling mechanistic fish population dynamics through explicit recruitment.
 
-The energy budget follows a two-stage partitioning:
+## The Dual-Pathway Growth Model
+
+### Zooplankton: GGE Pathway
+
+Zooplankton growth uses the original ZooMSS formulation where growth efficiency is determined entirely by prey properties. For predator $i$ consuming prey group $j$:
+
+$$
+E_{ij} = \text{GrossGEscale}_j \times C_j
+$$
+
+where $C_j$ is the prey Carbon content (g C / g wet weight) and $\text{GrossGEscale}_j$ is a scaling coefficient (typically 2.5). This approach treats growth efficiency as a property of the prey, reflecting the nutritional quality of different food sources.
+
+For phytoplankton consumption, the efficiency is:
+$$
+E_{i,\text{phyto}} = \text{GrossGEscale}_i \times C_{\text{phyto}}
+$$
+
+where $C_{\text{phyto}} = 0.1$ is the Carbon content of phytoplankton.
+
+### Fish: Explicit Energy Budget
+
+Fish groups use a two-stage energy partitioning based on DBPM theory:
 
 **Stage 1: Ingestion Partitioning**
 $$
@@ -100,41 +117,59 @@ $$
 D_{prey} = D_{high} + (D_{low} - D_{high}) \times \left(1 - \frac{C_{prey}}{C_{max}}\right)
 $$
 
-This formulation interpolates between low defecation for high-quality (high Carbon) prey and high defecation for low-quality (low Carbon) prey. The approach is based on the Dynamic Benthic-Pelagic Model (DBPM; Blanchard et al. 2009, 2012) which uses two food quality categories (D=0.30 for high quality, D=0.50 for low quality). We extend this to a continuous function using Carbon:wet weight ratio as a proxy for food quality.
+This interpolates between low defecation for high-quality (high Carbon) prey and high defecation for low-quality (low Carbon) prey (Blanchard et al. 2009, 2012).
 
 **Stage 2: Assimilation Partitioning**
 $$
 \text{Assimilated} = \text{Metabolism} + \text{Growth} + \text{Reproduction}
 $$
 
-Where: $f_M + K + R_{frac} = 1$
+Where: $f_M + K_{\text{growth}} + R_{\text{frac}} = 1$
+
+For immature fish (below maturation size $W_{\text{mat}}$), $R_{\text{frac}}$ energy is redirected to somatic growth. For mature fish, $R_{\text{frac}}$ energy drives reproductive investment and recruitment.
+
+### Why Two Pathways?
+
+The zooplankton GGE approach has been extensively validated against observed community composition across environmental gradients (Heneghan et al. 2016, 2020). Implementing the explicit energy budget for zooplankton altered community composition in ways that required additional calibration without clear benefit. The explicit energy budget is needed for fish because it enables mechanistic reproduction — energy partitioning into growth vs. reproduction is essential for modelling fish population dynamics under changing environmental and fishing pressure.
 
 ## Model Setup
 
-Let's load the default groups and examine the energy budget parameters:
+Let's load the default groups and examine the parameters for both pathways:
 
 ```{r}
 Groups <- getGroups()
 
-# Display energy budget parameters
-energy_params <- Groups[, c("Species", "Type", "def_high", "def_low",
-                            "f_M", "K_growth", "repro_on", "Carbon")]
-print(energy_params)
+# Display zooplankton GGE parameters
+cat("=== Zooplankton: GGE Pathway ===\n")
+zoo_params <- Groups[Groups$Type == "Zooplankton",
+                     c("Species", "GrossGEscale", "Carbon")]
+print(zoo_params)
+
+cat("\n=== Fish: Explicit Energy Budget ===\n")
+fish_params <- Groups[Groups$Type == "Fish",
+                      c("Species", "def_high", "def_low",
+                        "f_M", "K_growth", "repro_on", "Carbon")]
+print(fish_params)
+
+# Calculate R_frac for fish
+cat("\nFish R_frac = 1 - f_M - K_growth =",
+    1 - fish_params$f_M[1] - fish_params$K_growth[1], "\n")
 ```
 
 Notice that:
-- **Zooplankton** have `K_growth = 0.50` and `repro_on = 0` (all production goes to growth)
-- **Fish** have `K_growth = 0.36` and `repro_on = 1` (reproduction is enabled)
-- `R_frac = 1 - f_M - K_growth = 1 - 0.50 - 0.36 = 0.14` for fish
+
+- **Zooplankton** use `GrossGEscale × Carbon` for growth efficiency — the efficiency depends on what prey is consumed
+- **Fish** have `K_growth = 0.30`, `f_M = 0.50`, and `repro_on = 1` — reproduction is enabled with `R_frac = 0.20`
+- Both pathways use the same predation kernels, mortality, and temperature scaling — only the growth efficiency calculation differs
 
 ## Part 1: Constant Environmental Conditions
 
-First, let's run the model with constant temperature and chlorophyll (1 mg m⁻³) to establish baseline reproduction dynamics. We run for 1000 years to ensure the model reaches an oscillating steady-state, and average over the final 500 years for diagnostics.
+First, let's run the model with constant temperature and chlorophyll (1 mg m⁻³) to establish baseline dynamics. We run for 300 years and average over the final 100 years for diagnostics.
 
 ```{r}
-# Create constant environmental conditions - 1000 years
+# Create constant environmental conditions - 300 years
 env_constant <- createInputParams(
-  time = seq(0, 1000, by = 0.1),
+  time = seq(0, 300, by = 0.1),
   sst = 15,
   chl = 1.0
 )
@@ -145,7 +180,7 @@ plotEnvironment(env_constant)
 
 ```{r}
 # Run or load from cache
-mdl_constant <- run_or_load("mdl_constant_1000yr", env_constant, Groups, isave = 2, cache_dir = cache_dir)
+mdl_constant <- run_or_load("mdl_constant_300yr", env_constant, Groups, isave = 2, cache_dir = cache_dir)
 ```
 
 ### Visualizing the Energy Budget
@@ -160,17 +195,17 @@ This plot shows how assimilated energy is partitioned into metabolism, growth, a
 plotEnergyBudget(mdl_constant)
 ```
 
-Note that zooplankton allocate all production energy to growth (K = 0.50). For fish, the allocation depends on maturity: **immature fish** also allocate all production to growth (K + R_frac = 0.50), while **mature fish** split production between growth (K = 0.36) and reproduction (R_frac = 0.14). The transition is governed by a size-based maturity ogive.
+Note the dual-pathway distinction: zooplankton use GGE-based growth (the K_growth and f_M values shown are from their GroupInputs columns but are not used in growth calculations — zooplankton growth is driven entirely by `GrossGEscale × Carbon`). For fish, the allocation depends on maturity: **immature fish** redirect $R_{\text{frac}}$ to somatic growth, while **mature fish** split production between growth ($K_{\text{growth}}$) and reproduction ($R_{\text{frac}}$).
 
-#### Defecation by Prey Quality
+#### Defecation by Prey Quality (Fish Pathway)
 
-This plot shows how the defecation fraction experienced by a predator varies depending on the Carbon content of the prey it consumes:
+This plot shows how the defecation fraction experienced by fish varies depending on prey Carbon content:
 
 ```{r fig.height=5}
 plotDefecation(mdl_constant)
 ```
 
-When a predator consumes high-Carbon prey (e.g. ciliates at 0.15 g C/g WW), a larger proportion of the ingested material is nutritionally useful, resulting in low defecation (~30%). Conversely, when consuming low-Carbon prey such as gelatinous organisms (e.g. jellyfish at 0.005 g C/g WW), the high water content means most of the ingested material passes through as waste, resulting in high defecation (~95%). The defecation fraction scales linearly between these bounds ($D_{high}$ = 0.30 and $D_{low}$ = 0.95) as a function of the prey's Carbon:wet weight ratio relative to the maximum across all groups.
+When a fish predator consumes high-Carbon prey (e.g. ciliates at 0.15 g C/g WW), a larger proportion of the ingested material is nutritionally useful, resulting in low defecation (~30%). Conversely, when consuming low-Carbon prey such as gelatinous organisms (e.g. jellyfish at 0.005 g C/g WW), the high water content means most of the ingested material passes through as waste, resulting in high defecation (~95%). Note: zooplankton growth does not use this defecation pathway — their growth efficiency is determined by `GrossGEscale × Carbon_prey`.
 
 #### Prey-Specific Growth Efficiency Matrix
 
@@ -178,20 +213,39 @@ This heatmap shows the net growth efficiency for each predator-prey combination:
 
 ```{r fig.height=6}
 # ==========================================================================
-# FIX: The original plotAssimilationMatrix used mdl$assim_by_prey which only
-# contains (1 - D_prey). Since def_high/def_low are the same for all groups,
-# every row was identical. The true growth efficiency is (1 - D_prey) * K_pred
-# which varies by PREDATOR (since K_growth is group-specific).
+# Growth efficiency matrix — dual pathway
+# Zooplankton predators: GrossGEscale[prey] * Carbon[prey] (prey property, same for all zoo preds)
+# Fish predators: (1 - D_prey) * K_growth (predator-specific)
 # ==========================================================================
-
-# Calculate corrected growth efficiency matrix
-K_growth_vec <- mdl_constant$param$Groups$K_growth
-growth_eff_matrix <- sweep(mdl_constant$assim_by_prey, 1, K_growth_vec, "*")
 
 species <- mdl_constant$param$Groups$Species
 carbon <- mdl_constant$param$Groups$Carbon
 group_type <- mdl_constant$param$Groups$Type
 ngrps <- mdl_constant$param$ngrps
+GrossGEscale <- mdl_constant$param$Groups$GrossGEscale
+
+# Build growth efficiency matrix
+growth_eff_matrix <- matrix(NA, nrow = ngrps, ncol = ngrps)
+rownames(growth_eff_matrix) <- species
+colnames(growth_eff_matrix) <- species
+
+for (pred in 1:ngrps) {
+  for (prey in 1:ngrps) {
+    if (group_type[pred] == "Zooplankton") {
+      # GGE pathway: efficiency depends on prey only
+      growth_eff_matrix[pred, prey] <- GrossGEscale[prey] * carbon[prey]
+    } else {
+      # Fish energy budget: (1 - def) * K_growth
+      Carbon_max <- max(carbon)
+      def_high <- mdl_constant$param$Groups$def_high[pred]
+      def_low <- mdl_constant$param$Groups$def_low[pred]
+      K_growth_val <- mdl_constant$param$Groups$K_growth[pred]
+      carbon_frac <- carbon[prey] / Carbon_max
+      def_eff <- def_high + (def_low - def_high) * (1 - carbon_frac)
+      growth_eff_matrix[pred, prey] <- (1 - def_eff) * K_growth_val
+    }
+  }
+}
 
 # Order prey by Carbon content (low to high)
 prey_order <- species[order(carbon)]
@@ -208,17 +262,17 @@ assim_long$prey <- factor(assim_long$prey, levels = prey_order)
 ggplot(assim_long, aes(x = prey, y = predator, fill = efficiency)) +
   geom_tile() +
   geom_text(aes(label = round(efficiency, 3)), size = 2.5, colour = "white") +
-  scale_fill_viridis_c(option = "plasma", limits = c(0, max(growth_eff_matrix) * 1.1)) +
+  scale_fill_viridis_c(option = "plasma", limits = c(0, max(growth_eff_matrix, na.rm = TRUE) * 1.1)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(x = "Prey Group (ordered by Carbon content)",
        y = "Predator Group",
        fill = "Growth\nEfficiency",
-       title = "Prey-Specific Growth Efficiency",
-       subtitle = expression("(1 - D"[prey]*") \u00D7 K"[predator]))
+       title = "Prey-Specific Growth Efficiency (Dual Pathway)",
+       subtitle = "Zoo predators: GGE×Carbon | Fish predators: (1-D)×K_growth")
 ```
 
-This matrix displays the growth efficiency for each predator-prey combination, calculated as $(1 - D_{prey}) \times K_{predator}$. Prey are ordered by Carbon content along the x-axis (low Carbon like Larvaceans and Salps on the left, high Carbon like Ciliates on the right). Higher values (brighter colours) indicate that a predator gains more somatic growth per unit prey consumed. Importantly, predators with higher K_growth (e.g., Flagellates/Ciliates at 0.55) show higher growth efficiency **within each column** than those with lower K_growth (e.g., Fish at 0.36 or Euphausiids at 0.25), demonstrating the predator-specific nature of growth efficiency.
+This matrix displays the growth efficiency for each predator-prey combination. Note the clear distinction between the two pathways: all zooplankton predator rows share identical values (since GGE efficiency is a prey property), while fish predator rows show different values reflecting the energy budget calculation with predator-specific $K_{\text{growth}}$. Prey are ordered by Carbon content along the x-axis (low Carbon like Larvaceans and Salps on the left, high Carbon like Ciliates on the right).
 
 ### Biomass Dynamics
 
@@ -273,11 +327,11 @@ fish_names <- mdl_constant$param$Groups$Species[fish_grps]
 fish_colours <- mdl_constant$param$Groups$PlotColour[fish_grps]
 names(fish_colours) <- fish_names
 
-# Use final 500 years of data for steady-state S-R relationships
+# Use final 100 years of data for steady-state S-R relationships
 n_save <- length(mdl_constant$time)
 dt_save <- mdl_constant$param$isave * mdl_constant$param$dt
-n_500yr <- min(n_save, round(500 / dt_save))
-start_idx <- max(1, n_save - n_500yr + 1)
+n_100yr <- min(n_save, round(100 / dt_save))
+start_idx <- max(1, n_save - n_100yr + 1)
 
 sr_data <- data.frame()
 for (f in seq_along(fish_names)) {
@@ -293,9 +347,6 @@ for (f in seq_along(fish_names)) {
 sr_data$Fish_Group <- factor(sr_data$Fish_Group, levels = fish_names)
 
 # Stock-recruitment scatter plots
-# Points show individual time steps; connecting paths trace the temporal
-# trajectory through S-R space (chronological order), revealing the
-# oscillatory dynamics as the population cycles between high and low SSB
 p_sr <- ggplot(sr_data, aes(x = SSB, y = Recruitment, colour = Fish_Group)) +
   geom_point(alpha = 0.3, size = 1) +
   geom_path(alpha = 0.15, linewidth = 0.3) +
@@ -305,9 +356,9 @@ p_sr <- ggplot(sr_data, aes(x = SSB, y = Recruitment, colour = Fish_Group)) +
   labs(x = "Spawning Stock Biomass (SSB)",
        y = "Recruitment (individuals)",
        title = "Stock-Recruitment Relationships",
-       subtitle = "Final 500 years — paths trace temporal trajectory through S-R space")
+       subtitle = "Final 100 years — paths trace temporal trajectory through S-R space")
 
-# SSB vs Recruitment with log axes for comparison
+# SSB vs Recruitment with log axes
 p_sr_log <- ggplot(sr_data %>% filter(SSB > 0 & Recruitment > 0),
                    aes(x = SSB, y = Recruitment, colour = Fish_Group)) +
   geom_point(alpha = 0.3, size = 1) +
@@ -323,20 +374,20 @@ p_sr_log <- ggplot(sr_data %>% filter(SSB > 0 & Recruitment > 0),
 wrap_plots(p_sr, p_sr_log, ncol = 1)
 ```
 
-The stock-recruitment relationships show the emergent dynamics between spawning biomass and recruitment. In the constant environment, the oscillating steady-state creates characteristic trajectories in S-R space. The connecting paths trace the chronological trajectory — each path follows the population forward through time, revealing how the system orbits through S-R space as SSB and recruitment oscillate out of phase. The relationship is driven by the explicit energy budget where mature fish invest R_frac of their assimilated energy into reproduction, which is then converted to recruits via the reproductive efficiency parameter.
+The stock-recruitment relationships show the emergent dynamics between spawning biomass and recruitment. In the constant environment, the oscillating steady-state creates characteristic trajectories in S-R space. The relationship is driven by the explicit fish energy budget where mature fish invest $R_{\text{frac}}$ of their assimilated energy into reproduction, which is then converted to recruits via the reproductive efficiency parameter.
 
 ### Growth Rate Comparison
 
 Compare growth rates between fish and zooplankton:
 
 ```{r fig.height=6}
-# Growth rates for zooplankton (higher K_growth = 0.50)
-p_zoo <- plotGrowthComparison(mdl_constant, groups = "zooplankton", n_years = 500) +
-  ggtitle("Zooplankton Growth Rates")
+# Growth rates for zooplankton (GGE pathway)
+p_zoo <- plotGrowthComparison(mdl_constant, groups = "zooplankton", n_years = 100) +
+  ggtitle("Zooplankton Growth Rates (GGE Pathway)")
 
-# Growth rates for fish (lower K_growth = 0.36, with reproduction)
-p_fish <- plotGrowthComparison(mdl_constant, groups = "fish", n_years = 500) +
-  ggtitle("Fish Growth Rates")
+# Growth rates for fish (energy budget pathway, with reproduction)
+p_fish <- plotGrowthComparison(mdl_constant, groups = "fish", n_years = 100) +
+  ggtitle("Fish Growth Rates (Energy Budget Pathway)")
 
 wrap_plots(p_zoo, p_fish, ncol = 1, guides = "collect")
 ```
@@ -346,7 +397,7 @@ wrap_plots(p_zoo, p_fish, ncol = 1, guides = "collect")
 Examine how reproductive investment varies with body size:
 
 ```{r}
-plotReproSizeSpectra(mdl_constant, n_years = 500) +
+plotReproSizeSpectra(mdl_constant, n_years = 100) +
   ggtitle("Fish Reproductive Rate by Body Size")
 ```
 
@@ -358,11 +409,11 @@ The reproductive rate increases with body size within each fish group, reflectin
 
 ```{r fig.height=6}
 # Abundance size spectrum
-p_abund <- plotSizeSpectra(mdl_constant, by = "abundance", n_years = 500) +
+p_abund <- plotSizeSpectra(mdl_constant, by = "abundance", n_years = 100) +
   ggtitle("Abundance Size Spectrum")
 
 # Biomass size spectrum
-p_biom <- plotSizeSpectra(mdl_constant, by = "biomass", n_years = 500) +
+p_biom <- plotSizeSpectra(mdl_constant, by = "biomass", n_years = 100) +
   ggtitle("Biomass Size Spectrum")
 
 wrap_plots(p_abund, p_biom, ncol = 1, guides = "collect")
@@ -370,12 +421,12 @@ wrap_plots(p_abund, p_biom, ncol = 1, guides = "collect")
 
 ## Part 2: Seasonal Environmental Forcing
 
-Now let's compare with seasonal environmental conditions to see how reproduction responds to environmental variability. We use the same base chlorophyll (1 mg m⁻³) but with seasonal variation, run for 1000 years.
+Now let's compare with seasonal environmental conditions to see how reproduction responds to environmental variability. We use the same base chlorophyll (1 mg m⁻³) but with seasonal variation, run for 300 years.
 
 ```{r}
 # Create seasonal environmental conditions
 env_seasonal <- createEnviroData(
-  n_years = 1000,
+  n_years = 300,
   dt = 0.1,
   base_sst = 15,
   base_chl = 1.0,
@@ -396,28 +447,28 @@ plotEnvironment(env_seasonal_params)
 
 ```{r}
 # Run or load from cache
-mdl_seasonal <- run_or_load("mdl_seasonal_1000yr", env_seasonal_params, Groups, isave = 2, cache_dir = cache_dir)
+mdl_seasonal <- run_or_load("mdl_seasonal_300yr", env_seasonal_params, Groups, isave = 2, cache_dir = cache_dir)
 ```
 
 ### Comparing Constant vs Seasonal: Biomass
 
 ```{r fig.height=9}
-# Constant environment biomass - focus on years 500-1000
+# Constant environment biomass - focus on final 100 years
 p_const <- plotTimeSeries(mdl_constant, by = "biomass",
                           species = c("Fish_Small", "Fish_Med", "Fish_Large"),
                           transform = "log10") +
   ggtitle("Constant Environment - Fish Biomass") +
-  xlim(500, 1000)
+  xlim(200, 300)
 
 # Seasonal environment biomass
 p_seas <- plotTimeSeries(mdl_seasonal, by = "biomass",
                          species = c("Fish_Small", "Fish_Med", "Fish_Large"),
                          transform = "log10") +
   ggtitle("Seasonal Environment - Fish Biomass") +
-  xlim(500, 1000)
+  xlim(200, 300)
 
 # Show the seasonal forcing for context
-p_env <- plotEnvironment(env_seasonal_params) & xlim(500, 1000)
+p_env <- plotEnvironment(env_seasonal_params) & xlim(200, 300)
 
 wrap_plots(p_const, p_seas, p_env, ncol = 1, heights = c(1, 1, 1))
 ```
@@ -427,17 +478,17 @@ wrap_plots(p_const, p_seas, p_env, ncol = 1, heights = c(1, 1, 1))
 ```{r fig.height=9}
 # SSB comparison
 p_ssb_const <- plotReproduction(mdl_constant, by = "SSB") +
-  ggtitle("Constant - SSB") + xlim(500, 1000)
+  ggtitle("Constant - SSB") + xlim(200, 300)
 
 p_ssb_seas <- plotReproduction(mdl_seasonal, by = "SSB") +
-  ggtitle("Seasonal - SSB") + xlim(500, 1000)
+  ggtitle("Seasonal - SSB") + xlim(200, 300)
 
 # Recruitment comparison
 p_rec_const <- plotReproduction(mdl_constant, by = "recruitment") +
-  ggtitle("Constant - Recruitment") + xlim(500, 1000)
+  ggtitle("Constant - Recruitment") + xlim(200, 300)
 
 p_rec_seas <- plotReproduction(mdl_seasonal, by = "recruitment") +
-  ggtitle("Seasonal - Recruitment") + xlim(500, 1000)
+  ggtitle("Seasonal - Recruitment") + xlim(200, 300)
 
 wrap_plots(p_ssb_const, p_ssb_seas, p_rec_const, p_rec_seas,
            ncol = 2, guides = "collect")
@@ -447,7 +498,7 @@ wrap_plots(p_ssb_const, p_ssb_seas, p_rec_const, p_rec_seas,
 
 ```{r fig.height=8}
 # Build S-R data for both scenarios
-build_sr_data <- function(mdl, scenario_name, n_years_avg = 500) {
+build_sr_data <- function(mdl, scenario_name, n_years_avg = 100) {
   fish_grps <- mdl$param$fish_grps
   fish_names <- mdl$param$Groups$Species[fish_grps]
   n_save <- length(mdl$time)
@@ -482,12 +533,12 @@ ggplot(sr_combined %>% filter(SSB > 0 & Recruitment > 0),
   labs(x = "Spawning Stock Biomass (SSB)",
        y = "Recruitment",
        title = "Stock-Recruitment: Constant vs Seasonal Environment",
-       subtitle = "Final 500 years of 1000-year simulations")
+       subtitle = "Final 100 years of 300-year simulations")
 ```
 
 ## Part 3: Exploring Chlorophyll Gradients
 
-Let's explore how productivity (chlorophyll concentration) affects reproduction metrics and community composition across a wide gradient from oligotrophic to eutrophic conditions. For the chlorophyll *a* gradient, a distribution of log~10~(Chlorophyll *a*) values were computed at 0.1 intervals between -1.7 and 0.5 log~10~(Chlorophyll *a*) (n = 23) and the mean proportion calculated for each of the bins. We run each scenario for 1000 years to ensure steady-state.
+Let's explore how productivity (chlorophyll concentration) affects reproduction metrics and community composition across a wide gradient from oligotrophic to eutrophic conditions. For the chlorophyll *a* gradient, a distribution of log~10~(Chlorophyll *a*) values were computed at 0.1 intervals between -1.7 and 0.5 log~10~(Chlorophyll *a*) (n = 23) and the mean proportion calculated for each of the bins. We run each scenario for 300 years to ensure near-steady-state.
 
 ```{r}
 # Chlorophyll gradient: log10(chl) from -1.7 to 0.5 at 0.1 intervals (n = 23)
@@ -508,7 +559,7 @@ results_chl <- list()
 for (temp in sst_variants) {
   temp_char <- as.character(temp)
   results_chl[[temp_char]] <- lapply(seq_along(chl_levels), function(i) {
-    cache_name <- sprintf("mdl_chl_log10_%.1f_sst%d_1000yr", log10(chl_levels[i]), temp)
+    cache_name <- sprintf("mdl_chl_log10_%.1f_sst%d_300yr", log10(chl_levels[i]), temp)
     cache_file <- file.path(cache_dir, paste0(cache_name, ".rds"))
     if (!file.exists(cache_file)) stop("Missing cache: ", cache_name,
       ". Run source('vignettes/run_gradient_models.R') first.")
@@ -534,8 +585,8 @@ for (temp in sst_variants) {
     mdl <- results_chl[[temp_char]][[i]]
     final_idx <- length(mdl$time)
 
-    # Average biomass over last 500 years
-    avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 500)
+    # Average biomass over last 100 years
+    avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
     fish_biomass <- rowSums(avg_biomass[fish_grps, , drop = FALSE])
 
     for (f in 1:num_fish) {
@@ -610,7 +661,7 @@ wrap_plots(p_biomass, p_ssb, p_recruit, ncol = 1, guides = "collect")
 sr_chl_data <- data.frame()
 for (i in seq_along(chl_levels)) {
   mdl <- results_chl[["15"]][[i]]
-  sr_temp <- build_sr_data(mdl, paste0("Chl = ", round(chl_levels[i], 3), " mg/m³"), n_years_avg = 500)
+  sr_temp <- build_sr_data(mdl, paste0("Chl = ", round(chl_levels[i], 3), " mg/m\u00B3"), n_years_avg = 100)
   sr_temp$chl <- chl_levels[i]
   sr_chl_data <- rbind(sr_chl_data, sr_temp)
 }
@@ -625,7 +676,7 @@ ggplot(sr_chl_data %>% filter(SSB > 0 & Recruitment > 0),
   labs(x = "Spawning Stock Biomass (SSB)",
        y = "Recruitment",
        title = "Stock-Recruitment Across Productivity Gradient (15\u00B0C)",
-       subtitle = "Final 500 years of 1000-year simulations")
+       subtitle = "Final 100 years of 300-year simulations")
 ```
 
 ### Community Composition Across the Gradient
@@ -637,7 +688,7 @@ Let's examine how community composition changes across the productivity gradient
 # HELPER: Extract community composition with phytoplankton size classes
 # ============================================================================
 extract_community_composition <- function(results_list, chl_levels, Groups,
-                                          n_years_avg = 500) {
+                                          n_years_avg = 100) {
 
   all_species <- Groups$Species
   ngrps <- length(all_species)
@@ -682,7 +733,7 @@ extract_community_composition <- function(results_list, chl_levels, Groups,
 # HELPER: Create split-panel community composition plot
 # ============================================================================
 plot_split_community <- function(results_list, chl_levels, Groups,
-                                 temperature_label, n_years_avg = 500) {
+                                 temperature_label, n_years_avg = 100) {
 
   comp <- extract_community_composition(results_list, chl_levels, Groups,
                                         n_years_avg = n_years_avg)
@@ -765,19 +816,19 @@ plot_split_community <- function(results_list, chl_levels, Groups,
 
 # ---- Plot community composition at 15°C ----
 plot_split_community(results_chl[["15"]], chl_levels, Groups,
-                     "15\u00B0C", n_years_avg = 500)
+                     "15\u00B0C", n_years_avg = 100)
 ```
 
 ```{r fig.height=14}
 # ---- Plot community composition at 10°C ----
 plot_split_community(results_chl[["10"]], chl_levels, Groups,
-                     "10\u00B0C", n_years_avg = 500)
+                     "10\u00B0C", n_years_avg = 100)
 ```
 
 ```{r fig.height=14}
 # ---- Plot community composition at 20°C ----
 plot_split_community(results_chl[["20"]], chl_levels, Groups,
-                     "20\u00B0C", n_years_avg = 500)
+                     "20\u00B0C", n_years_avg = 100)
 ```
 
 ### Full Community Composition (Including Fish)
@@ -794,7 +845,7 @@ names(plot_colours) <- all_species
 biomass_full <- data.frame()
 for (i in seq_along(chl_levels)) {
   mdl <- results_chl[["15"]][[i]]
-  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 500)
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
   total_biomass <- rowSums(avg_biomass)
 
   for (g in 1:ngrps) {
@@ -814,7 +865,7 @@ biomass_full <- biomass_full %>%
 
 biomass_full$species <- factor(biomass_full$species, levels = all_species)
 
-# Proportion plot - using log10(chl) on x-axis to match other gradient plots
+# Proportion plot
 p_prop <- ggplot(biomass_full,
                  aes(x = log10(chl), y = proportion, fill = species)) +
   geom_area(position = "stack") +
@@ -845,7 +896,7 @@ wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
 
 ## Part 4: Temperature Effects
 
-Explore how temperature affects fish reproduction through metabolic scaling. We run 1000-year simulations at 1 mg m⁻³ chlorophyll across a temperature gradient.
+Explore how temperature affects fish reproduction through metabolic scaling. We run 300-year simulations at 1 mg m⁻³ chlorophyll across a temperature gradient.
 
 ```{r}
 # Load pre-computed models across temperature gradient
@@ -853,7 +904,7 @@ Explore how temperature affects fish reproduction through metabolic scaling. We 
 sst_levels <- c(5, 10, 15, 20, 25)
 
 results_sst <- lapply(seq_along(sst_levels), function(i) {
-  cache_name <- sprintf("mdl_sst%d_chl1_1000yr", sst_levels[i])
+  cache_name <- sprintf("mdl_sst%d_chl1_300yr", sst_levels[i])
   cache_file <- file.path(cache_dir, paste0(cache_name, ".rds"))
   if (!file.exists(cache_file)) stop("Missing cache: ", cache_name,
     ". Run source('vignettes/run_gradient_models.R') first.")
@@ -872,7 +923,7 @@ for (i in seq_along(sst_levels)) {
   final_idx <- length(mdl$time)
   fish_grps <- mdl$param$fish_grps
 
-  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 500)
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
   fish_biomass <- rowSums(avg_biomass[fish_grps, , drop = FALSE])
 
   for (f in 1:num_fish) {
@@ -927,7 +978,7 @@ sr_sst_data <- data.frame()
 for (i in seq_along(sst_levels)) {
   sr_temp <- build_sr_data(results_sst[[i]],
                            paste0(sst_levels[i], "\u00B0C"),
-                           n_years_avg = 500)
+                           n_years_avg = 100)
   sr_temp$sst <- sst_levels[i]
   sr_sst_data <- rbind(sr_sst_data, sr_temp)
 }
@@ -945,7 +996,7 @@ ggplot(sr_sst_data %>% filter(SSB > 0 & Recruitment > 0),
   labs(x = "Spawning Stock Biomass (SSB)",
        y = "Recruitment",
        title = "Stock-Recruitment Across Temperature Gradient",
-       subtitle = "Final 500 years of 1000-year simulations at 1 mg/m\u00B3 chlorophyll")
+       subtitle = "Final 100 years of 300-year simulations at 1 mg/m\u00B3 chlorophyll")
 ```
 
 ### Community Composition Across the Temperature Gradient
@@ -955,7 +1006,7 @@ ggplot(sr_sst_data %>% filter(SSB > 0 & Recruitment > 0),
 biomass_sst <- data.frame()
 for (i in seq_along(sst_levels)) {
   mdl <- results_sst[[i]]
-  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 500)
+  avg_biomass <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
   total_biomass <- rowSums(avg_biomass)
 
   for (g in 1:ngrps) {
@@ -1001,40 +1052,34 @@ wrap_plots(p_prop, p_abs, ncol = 1, guides = "collect")
 
 ## Summary
 
-This vignette demonstrated the explicit energy budget and fish reproduction system in ZooMSS:
+This vignette demonstrated the dual-pathway growth model and fish reproduction system in ZooMSS:
 
-1. **Energy Budget Components**: The model now explicitly tracks defecation, metabolism, growth, and reproduction fractions
+1. **Dual Growth Pathways**: Zooplankton use the original GGE approach ($E_{ij} = \text{GrossGEscale} \times C_{\text{prey}}$) preserving validated community composition, while fish use an explicit energy budget with prey-specific defecation and partitioning into metabolism, growth, and reproduction
 
-2. **Prey Quality Effects**: Defecation varies continuously with prey Carbon content - high-Carbon prey (like ciliates) have low defecation (~30%) while low-Carbon prey (like jellyfish) have high defecation (~50%)
+2. **Prey Quality Effects (Fish)**: Fish defecation varies continuously with prey Carbon content — high-Carbon prey (like ciliates) have low defecation (~30%) while low-Carbon prey (like jellyfish) have high defecation (~95%)
 
-3. **Fish Reproduction**: Fish groups allocate a fraction of assimilated energy (R_frac = 0.14) to reproduction, scaled by a maturity ogive
+3. **Fish Reproduction**: Fish groups allocate $R_{\text{frac}}$ of assimilated energy to reproduction, scaled by a maturity ogive that transitions smoothly around the maturation size
 
-4. **Recruitment**: New fish enter the population through explicit recruitment based on Spawning Stock Biomass (SSB)
+4. **Recruitment**: New fish enter the population through explicit recruitment based on Spawning Stock Biomass (SSB) and reproductive efficiency
 
 5. **Stock-Recruitment Relationships**: Emergent S-R dynamics arise from the energy budget, with characteristic patterns that vary across environmental gradients
 
-6. **Environmental Sensitivity**: Reproduction metrics respond to:
-   - Productivity (chlorophyll concentration)
-   - Temperature (through metabolic scaling)
-   - Seasonal cycles in environmental conditions
+6. **Environmental Sensitivity**: Reproduction metrics respond to productivity (chlorophyll), temperature (metabolic scaling), and seasonal cycles
 
-### Key Differences from Zooplankton
+### Key Differences Between Pathways
 
 | Aspect | Zooplankton | Fish |
 |--------|-------------|------|
-| K_growth | 0.50 | 0.36 |
-| R_frac | 0.00 | 0.14 |
-| repro_on | 0 (disabled) | 1 (enabled) |
-| Recruitment | Boundary condition | SSB-driven |
+| Growth efficiency | GrossGEscale × Carbon (prey property) | (1 − D) × K_growth (energy budget) |
+| Phyto assimilation | GrossGEscale × cc_phyto | (1 − def_phyto) |
+| Diffusion scaling | (GGE)² | eff_K² × (1 − def)² |
+| Reproduction | None (boundary condition) | R_frac → SSB → recruitment |
+| Boundary condition | Proportional lock | Semi-implicit recruitment |
 
-**Note on zooplankton R_frac:** Most zooplankton groups have R_frac > 0 (0.15–0.20), representing real energy allocated to reproduction. Below maturation size, this energy is redirected to somatic growth; above maturation size, it is lost from the modelled population (zooplankton recruitment uses boundary conditions that do not respond to reproductive investment). Flagellates and Ciliates have R_frac = 0 because they reproduce by binary fission. The energy budget framework supports future implementation of explicit zooplankton reproduction.
-
-The explicit energy budget provides a mechanistic foundation for understanding how environmental change affects fish population dynamics through reproduction.
+The dual-pathway design provides a mechanistic foundation for understanding how environmental change and fishing pressure affect fish population dynamics through reproduction, while maintaining consistency with the well-validated zooplankton community composition from the original ZooMSS.
 
 ## Session Info
 
 ```{r}
 sessionInfo()
 ```
-
-
