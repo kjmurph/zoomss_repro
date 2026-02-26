@@ -1,0 +1,744 @@
+---
+title: "Why Reproduction Matters: Fishing Dynamics in Legacy vs Dual-Pathway ZooMSS"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    code_folding: hide
+    number_sections: false
+vignette: >
+  %\VignetteIndexEntry{Fishing Dynamics: Legacy vs Dual-Pathway}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+options(rmarkdown.html_vignette.check_title = FALSE)
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width = 9,
+  fig.height = 5,
+  message   = FALSE,
+  warning   = FALSE
+)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(zoomss)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+```
+
+## Motivation
+
+The legacy ZooMSS model maintains fish populations via a simple **proportional boundary condition**: the abundance at the minimum fish size class is set to a fixed fraction of zooplankton abundance at that size. This means fish can never truly be fished out — the moment fishing reduces fish biomass, the boundary condition instantly replenishes recruits in proportion to zooplankton. There is no memory of past spawner abundance, no stock–recruitment feedback, and no recruitment overfishing.
+
+The dual-pathway model replaces this with an explicit **SSB → reproductive output → recruitment** chain:
+
+$$\text{R}(t) = \frac{\sum_w \psi(w) \cdot R_\text{frac} \cdot g(w,t) \cdot N(w,t) \cdot w \cdot \delta w \;\times\; \varepsilon_R}{w_\text{min} \cdot \delta w}$$
+
+where $\psi(w)$ is the maturity ogive, $R_\text{frac}$ is the reproductive energy fraction, and $\varepsilon_R$ is egg-to-recruit survival. Under this formulation:
+
+- Overfishing depletes SSB → fewer recruits → further biomass decline (a positive feedback toward collapse)
+- Recovery after fishing requires SSB to rebuild before recruitment recovers (a realistic lag)
+- Selective removal of large, mature individuals disproportionately damages reproduction
+
+This vignette runs **identical fishing scenarios** through both model versions and shows where the biological differences are most consequential.
+
+## Setup
+
+```{r}
+# ---- Shared helper functions ----
+
+extract_catch <- function(mdl,
+                          fish_names = c("Fish_Small", "Fish_Med", "Fish_Large")) {
+  n_time <- length(mdl$time)
+  n_fish <- length(fish_names)
+
+  if (is.null(mdl$catch)) {
+    catch_vals <- rep(0, n_time * n_fish)
+  } else {
+    catch_vals <- as.vector(mdl$catch)   # nsave × num_fish → column-major vector
+  }
+
+  data.frame(
+    time  = rep(mdl$time,    times = n_fish),
+    catch = catch_vals,
+    group = rep(fish_names, each  = n_time)
+  )
+}
+
+avg_final <- function(mdl, frac = 0.2) {
+  nsave     <- length(mdl$time)
+  final_idx <- max(1, floor(nsave * (1 - frac))):nsave
+  list(mdl = mdl, idx = final_idx)
+}
+
+get_fish_colours <- function(mdl) {
+  fc <- mdl$param$Groups$PlotColour[mdl$param$fish_grps]
+  names(fc) <- mdl$param$Groups$Species[mdl$param$fish_grps]
+  fc
+}
+
+get_all_colours <- function(mdl) {
+  ac <- mdl$param$Groups$PlotColour
+  names(ac) <- mdl$param$Groups$Species
+  ac
+}
+
+fish_names <- c("Fish_Small", "Fish_Med", "Fish_Large")
+
+# ---- Base Groups ----
+# Legacy: repro_on = 0 for all fish (proportional boundary condition)
+Groups_legacy <- getGroups()
+Groups_legacy$repro_on[Groups_legacy$Type == "Fish"] <- 0
+
+# Dual-pathway: repro_on = 1 (default)
+Groups_new <- getGroups()
+stopifnot(all(Groups_new$repro_on[Groups_new$Type == "Fish"] == 1))
+
+# Helper: run both versions from the same input_params and fishing Groups
+run_both <- function(input_params_base, q_small, q_med, q_large,
+                     effort_vec = NULL, isave = 5,
+                     w_min_small = NULL, w_min_med = NULL, w_min_large = NULL) {
+
+  Grps_leg <- setFishingParams(Groups_legacy,
+                               q_small = q_small, q_med = q_med, q_large = q_large,
+                               w_min_small = w_min_small, w_min_med = w_min_med,
+                               w_min_large = w_min_large)
+
+  Grps_new <- setFishingParams(Groups_new,
+                               q_small = q_small, q_med = q_med, q_large = q_large,
+                               w_min_small = w_min_small, w_min_med = w_min_med,
+                               w_min_large = w_min_large)
+
+  # Both Groups now have a q column; effort columns are added below
+  if (!is.null(effort_vec)) {
+    ip <- addFishingEffort(input_params_base,
+                           effort_small = effort_vec,
+                           effort_med   = effort_vec,
+                           effort_large = effort_vec)
+  } else {
+    ip <- input_params_base
+  }
+
+  # Sanity check: catch will only be non-NULL when both conditions hold
+  stopifnot("q" %in% names(Grps_leg),
+            any(c("effort_fish_small", "effort_small") %in% names(ip)))
+
+  list(
+    legacy = zoomss_model(input_params = ip, Groups = Grps_leg, isave = isave),
+    new    = zoomss_model(input_params = ip, Groups = Grps_new, isave = isave)
+  )
+}
+```
+
+## Part 1: Unfished Baseline
+
+We first establish unfished equilibria for both model versions. Any baseline differences reflect the energy-budget changes alone (no fishing), providing a clean reference for interpreting the fishing comparisons below.
+
+```{r}
+env_base <- createInputParams(time = seq(0, 200, by = 0.1), sst = 15, chl = 1.0)
+
+mdl_base_leg <- zoomss_model(input_params = env_base, Groups = Groups_legacy, isave = 5)
+mdl_base_new <- zoomss_model(input_params = env_base, Groups = Groups_new,    isave = 5)
+```
+
+```{r fig.height=7}
+p_base_leg <- plotTimeSeries(mdl_base_leg, by = "biomass",
+                             species = fish_names, transform = "log10") +
+  ggtitle("Legacy — Unfished Fish Biomass") + xlim(50, 200)
+
+p_base_new <- plotTimeSeries(mdl_base_new, by = "biomass",
+                             species = fish_names, transform = "log10") +
+  ggtitle("Dual-pathway — Unfished Fish Biomass") + xlim(50, 200)
+
+wrap_plots(p_base_leg, p_base_new, ncol = 1, guides = "collect")
+```
+
+```{r fig.height=7}
+p_ssb_base <- plotReproduction(mdl_base_new, by = "SSB") +
+  ggtitle("Dual-pathway — Unfished SSB") + xlim(50, 200)
+
+p_rec_base <- plotReproduction(mdl_base_new, by = "recruitment") +
+  ggtitle("Dual-pathway — Unfished Recruitment") + xlim(50, 200)
+
+wrap_plots(p_ssb_base, p_rec_base, ncol = 1, guides = "collect")
+```
+
+In the legacy model there is no SSB or recruitment output — fish biomass is sustained entirely by the proportional boundary condition. The dual-pathway model shows stable SSB and recruitment time series that confirm the stock–recruitment loop has reached equilibrium.
+
+## Part 2: Moderate Constant Fishing
+
+We apply the same moderate fishing mortality to both models and compare the equilibrium responses. Because the legacy model cannot represent recruitment overfishing, the two models are expected to diverge most strongly at high effort.
+
+```{r}
+env_fish <- createInputParams(time = seq(0, 200, by = 0.1), sst = 15, chl = 1.0)
+
+runs_mod <- run_both(env_fish,
+                     q_small = 1, q_med = 1, q_large = 1,
+                     effort_vec = 1.0)
+
+mdl_mod_leg <- runs_mod$legacy
+mdl_mod_new <- runs_mod$new
+
+fish_cols <- get_fish_colours(mdl_mod_new)
+```
+
+### Fish Biomass
+
+```{r fig.height=8}
+p_bm_leg <- plotTimeSeries(mdl_mod_leg, by = "biomass",
+                           species = fish_names, transform = "log10") +
+  ggtitle("Legacy — Fish Biomass Under Moderate Fishing") + xlim(50, 200)
+
+p_bm_new <- plotTimeSeries(mdl_mod_new, by = "biomass",
+                           species = fish_names, transform = "log10") +
+  ggtitle("Dual-pathway — Fish Biomass Under Moderate Fishing") + xlim(50, 200)
+
+wrap_plots(p_bm_leg, p_bm_new, ncol = 1, guides = "collect")
+```
+
+### Catch
+
+```{r fig.height=7}
+catch_leg <- extract_catch(mdl_mod_leg) %>% mutate(version = "Legacy")
+catch_new <- extract_catch(mdl_mod_new) %>% mutate(version = "Dual-pathway")
+catch_both <- bind_rows(catch_leg, catch_new) %>%
+  mutate(version = factor(version, levels = c("Legacy", "Dual-pathway")))
+
+ggplot(catch_both, aes(x = time, y = catch, colour = group, linetype = version)) +
+  geom_line(linewidth = 0.9) +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  theme_bw() +
+  labs(x = "Time (years)", y = "Catch (g WW)",
+       colour = "Fish Group", linetype = "Model",
+       title = "Predicted Catch — Legacy (dashed) vs Dual-pathway (solid)")
+```
+
+### SSB and Recruitment Under Moderate Fishing
+
+The legacy model produces no SSB diagnostics. The dual-pathway outputs reveal how the stock–recruitment loop is suppressed under fishing.
+
+```{r fig.height=8}
+p_ssb_new_mod <- plotReproduction(mdl_mod_new, by = "SSB") +
+  ggtitle("Dual-pathway — SSB Under Moderate Fishing") + xlim(50, 200)
+
+p_rec_new_mod <- plotReproduction(mdl_mod_new, by = "recruitment") +
+  ggtitle("Dual-pathway — Recruitment Under Moderate Fishing") + xlim(50, 200)
+
+p_ro_new_mod <- plotReproduction(mdl_mod_new, by = "repro_output") +
+  ggtitle("Dual-pathway — Reproductive Output Under Moderate Fishing") + xlim(50, 200)
+
+wrap_plots(p_ssb_new_mod, p_rec_new_mod, p_ro_new_mod, ncol = 1, guides = "collect")
+```
+
+```{r fig.height=6}
+p_repro_spec_base <- plotReproSizeSpectra(mdl_base_new, n_years = 20) +
+  ggtitle("Dual-pathway — Unfished: Reproductive Rate by Size")
+
+p_repro_spec_fish <- plotReproSizeSpectra(mdl_mod_new, n_years = 20) +
+  ggtitle("Dual-pathway — Fished: Reproductive Rate by Size")
+
+wrap_plots(p_repro_spec_base, p_repro_spec_fish, ncol = 1, guides = "collect")
+```
+
+Fishing removes the larger, more fecund individuals, compressing reproductive investment into smaller, less productive size classes. The legacy model cannot represent this process at all.
+
+## Part 3: Fishing Intensity Gradient — Yield–Effort Curves
+
+This is the most critical comparison. The yield–effort (or Schaefer) curve should show a **dome shape**: catch rises with effort at low exploitation, then falls as stock depletion outpaces fishing. The dome shape arises only when reduced SSB depresses recruitment — a feedback that is absent from the legacy model.
+
+```{r}
+effort_levels <- c(0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0)
+
+results_grad <- lapply(effort_levels, function(e) {
+  env_e <- createInputParams(time = seq(0, 200, by = 0.1), sst = 15, chl = 1.0)
+  run_both(env_e, q_small = 0.01, q_med = 0.02, q_large = 0.03,
+           effort_vec = e, isave = 5)
+})
+```
+
+```{r}
+num_fish <- 3
+
+extract_eq_summary <- function(results_list, effort_vec) {
+  out <- data.frame(
+    effort     = rep(effort_vec, each = num_fish),
+    fish_group = rep(fish_names, length(effort_vec)),
+    version    = character(length(effort_vec) * num_fish),
+    eq_catch   = NA_real_,
+    eq_biomass = NA_real_,
+    eq_SSB     = NA_real_,
+    eq_rec     = NA_real_,
+    stringsAsFactors = FALSE
+  )
+
+  for (v in c("legacy", "new")) {
+    label <- if (v == "legacy") "Legacy" else "Dual-pathway"
+    for (i in seq_along(effort_vec)) {
+      mdl_i     <- results_list[[i]][[v]]
+      nsave     <- length(mdl_i$time)
+      fish_grps <- mdl_i$param$fish_grps
+      fidx      <- max(1, floor(nsave * 0.8)):nsave
+
+      for (f in 1:num_fish) {
+        fg      <- fish_grps[f]
+        row_idx <- (i - 1) * num_fish + f
+
+        bm <- mean(apply(mdl_i$abundance[fidx, fg, , drop = FALSE], 1, function(r)
+          sum(r * mdl_i$param$w * mdl_i$param$dx)))
+
+        ct <- if (!is.null(mdl_i$catch))
+          mean(mdl_i$catch[fidx, f], na.rm = TRUE) else 0
+
+        ssb <- if (!is.null(mdl_i$SSB))
+          mean(mdl_i$SSB[fidx, f], na.rm = TRUE) else NA_real_
+
+        rec <- if (!is.null(mdl_i$recruitment))
+          mean(mdl_i$recruitment[fidx, f], na.rm = TRUE) else NA_real_
+
+        tmp_idx <- which(out$effort == effort_vec[i] &
+                           out$fish_group == fish_names[f] &
+                           (out$version == label | out$version == ""))
+        use_idx <- tmp_idx[out$version[tmp_idx] == "" | out$version[tmp_idx] == label][1]
+
+        # Build rows directly
+        out$version[use_idx]    <- label
+        out$eq_biomass[use_idx] <- bm
+        out$eq_catch[use_idx]   <- ct
+        out$eq_SSB[use_idx]     <- ssb
+        out$eq_rec[use_idx]     <- rec
+      }
+    }
+  }
+  out
+}
+
+# Cleaner approach: build two data frames and bind
+build_summary <- function(results_list, effort_vec, version_key, label) {
+  do.call(rbind, lapply(seq_along(effort_vec), function(i) {
+    mdl_i     <- results_list[[i]][[version_key]]
+    nsave     <- length(mdl_i$time)
+    fish_grps <- mdl_i$param$fish_grps
+    fidx      <- max(1, floor(nsave * 0.8)):nsave
+
+    do.call(rbind, lapply(seq_len(num_fish), function(f) {
+      fg <- fish_grps[f]
+      data.frame(
+        effort     = effort_vec[i],
+        fish_group = fish_names[f],
+        version    = label,
+        eq_catch   = if (!is.null(mdl_i$catch))
+          mean(mdl_i$catch[fidx, f], na.rm = TRUE) else 0,
+        eq_biomass = mean(apply(mdl_i$abundance[fidx, fg, , drop = FALSE], 1,
+          function(r) sum(r * mdl_i$param$w * mdl_i$param$dx))),
+        eq_SSB = if (!is.null(mdl_i$SSB))
+          mean(mdl_i$SSB[fidx, f], na.rm = TRUE) else NA_real_,
+        eq_rec = if (!is.null(mdl_i$recruitment))
+          mean(mdl_i$recruitment[fidx, f], na.rm = TRUE) else NA_real_
+      )
+    }))
+  }))
+}
+
+grad_leg <- build_summary(results_grad, effort_levels, "legacy", "Legacy")
+grad_new <- build_summary(results_grad, effort_levels, "new",    "Dual-pathway")
+grad_all <- bind_rows(grad_leg, grad_new) %>%
+  mutate(version = factor(version, levels = c("Legacy", "Dual-pathway")))
+```
+
+### Yield–Effort Curve
+
+```{r fig.height=6}
+ggplot(grad_all, aes(x = effort, y = eq_catch,
+                     colour = fish_group, linetype = version)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  theme_bw() +
+  labs(x = "Effort Multiplier", y = "Equilibrium Catch (g WW)",
+       colour = "Fish Group", linetype = "Model",
+       title = "Yield–Effort Curve",
+       subtitle = "Dome shape (MSY) only emerges in the dual-pathway model")
+```
+
+In the legacy model the yield–effort relationship is **monotonically increasing or flat**: because recruitment is maintained by the proportional boundary condition regardless of adult stock size, there is no mechanism for the stock to decline faster than fishing removes it. The dual-pathway model shows the ecologically expected dome — overfishing eventually depletes SSB sufficiently to suppress recruitment below replacement, causing total catch to fall.
+
+### Biomass Depletion vs Effort
+
+```{r fig.height=6}
+ggplot(grad_all, aes(x = effort, y = eq_biomass,
+                     colour = fish_group, linetype = version)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  scale_y_log10() +
+  theme_bw() +
+  labs(x = "Effort Multiplier", y = "Equilibrium Biomass (log scale)",
+       colour = "Fish Group", linetype = "Model",
+       title = "Biomass Depletion Under Increasing Effort")
+```
+
+### SSB and Recruitment vs Effort (Dual-Pathway Only)
+
+```{r fig.height=7}
+p_ssb_grad <- ggplot(grad_new, aes(x = effort, y = eq_SSB, colour = fish_group)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 3) +
+  scale_colour_manual(values = fish_cols) +
+  scale_y_log10() + theme_bw() +
+  labs(x = "Effort Multiplier", y = "Equilibrium SSB (log scale)",
+       colour = "Fish Group",
+       title = "SSB Depletion — Dual-pathway Model")
+
+p_rec_grad <- ggplot(grad_new, aes(x = effort, y = eq_rec, colour = fish_group)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 3) +
+  scale_colour_manual(values = fish_cols) +
+  scale_y_log10() + theme_bw() +
+  labs(x = "Effort Multiplier", y = "Equilibrium Recruitment (log scale)",
+       colour = "Fish Group",
+       title = "Recruitment Collapse — Dual-pathway Model")
+
+wrap_plots(p_ssb_grad, p_rec_grad, ncol = 1, guides = "collect")
+```
+
+The dual-pathway model shows SSB and recruitment declining steeply at high effort, consistent with classical stock–recruitment theory. This transition is invisible in the legacy model.
+
+### Relative Catch Difference Between Models
+
+To make the divergence explicit, we compute the relative difference in equilibrium catch at each effort level.
+
+```{r fig.height=5}
+catch_diff <- grad_all %>%
+  select(effort, fish_group, version, eq_catch) %>%
+  tidyr::pivot_wider(names_from = version, values_from = eq_catch) %>%
+  mutate(rel_diff = (`Dual-pathway` - Legacy) / Legacy)
+
+ggplot(catch_diff, aes(x = effort, y = rel_diff, colour = fish_group)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey40") +
+  scale_colour_manual(values = fish_cols) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  labs(x = "Effort Multiplier",
+       y = "Relative catch difference\n(Dual − Legacy) / Legacy",
+       colour = "Fish Group",
+       title = "Where Do the Models Diverge?",
+       subtitle = "Negative = legacy model overestimates sustainable catch")
+```
+
+At low effort the models agree reasonably well. As effort increases, the legacy model increasingly **overestimates sustainable catch** because it cannot represent the recruitment collapse that limits yield in the dual-pathway model. This has direct implications for catch advice and FishMIP projections.
+
+## Part 4: Catchability Gradient — Identifying Collapse Thresholds
+
+Sweeping across catchability ($q$) at fixed effort highlights where each model predicts stock collapse, and whether the legacy model produces any collapse at all.
+
+```{r}
+q_levels <- c(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5)
+
+results_q <- lapply(q_levels, function(q) {
+  env_q <- createInputParams(time = seq(0, 200, by = 0.1), sst = 15, chl = 1.0)
+  run_both(env_q, q_small = q, q_med = q, q_large = q,
+           effort_vec = 1.0, isave = 5)
+})
+
+q_leg <- build_summary(results_q, q_levels, "legacy", "Legacy")
+q_new <- build_summary(results_q, q_levels, "new",    "Dual-pathway")
+q_all <- bind_rows(q_leg, q_new) %>%
+  mutate(version = factor(version, levels = c("Legacy", "Dual-pathway")))
+```
+
+```{r fig.height=6}
+ggplot(q_all, aes(x = q_levels[match(eq_biomass, q_all$eq_biomass)],
+                  y = eq_biomass,
+                  colour = fish_group, linetype = version)) +
+  # Rebuild x from the q column we stored in fish_group mapping
+  geom_blank()  # placeholder; use proper q column below
+```
+
+```{r fig.height=7}
+# Rebuild with correct q mapping
+q_all2 <- bind_rows(
+  lapply(seq_along(q_levels), function(i) {
+    bind_rows(
+      lapply(c("legacy", "new"), function(v) {
+        label  <- if (v == "legacy") "Legacy" else "Dual-pathway"
+        mdl_i  <- results_q[[i]][[v]]
+        nsave  <- length(mdl_i$time)
+        fg_vec <- mdl_i$param$fish_grps
+        fidx   <- max(1, floor(nsave * 0.8)):nsave
+
+        do.call(rbind, lapply(seq_len(num_fish), function(f) {
+          fg <- fg_vec[f]
+          data.frame(
+            q          = q_levels[i],
+            fish_group = fish_names[f],
+            version    = label,
+            eq_catch   = if (!is.null(mdl_i$catch))
+              mean(mdl_i$catch[fidx, f], na.rm = TRUE) else 0,
+            eq_biomass = mean(apply(
+              mdl_i$abundance[fidx, fg, , drop = FALSE], 1,
+              function(r) sum(r * mdl_i$param$w * mdl_i$param$dx))),
+            eq_SSB = if (!is.null(mdl_i$SSB))
+              mean(mdl_i$SSB[fidx, f], na.rm = TRUE) else NA_real_,
+            eq_rec = if (!is.null(mdl_i$recruitment))
+              mean(mdl_i$recruitment[fidx, f], na.rm = TRUE) else NA_real_
+          )
+        }))
+      })
+    )
+  })
+) %>% mutate(version = factor(version, levels = c("Legacy", "Dual-pathway")))
+
+p_q_catch <- ggplot(q_all2, aes(x = q, y = eq_catch,
+                                 colour = fish_group, linetype = version)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 2.5) +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  scale_x_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium Catch (g WW)",
+       colour = "Fish Group", linetype = "Model",
+       title = "Yield–Catchability Curve")
+
+p_q_bm <- ggplot(q_all2, aes(x = q, y = eq_biomass,
+                               colour = fish_group, linetype = version)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 2.5) +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  scale_x_log10() + scale_y_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)", y = "Equilibrium Biomass (log scale)",
+       colour = "Fish Group", linetype = "Model",
+       title = "Biomass Depletion vs Catchability")
+
+wrap_plots(p_q_catch, p_q_bm, ncol = 1, guides = "collect")
+```
+
+### Biomass Depletion Ratio ($B/B_0$)
+
+```{r fig.height=6}
+# Reference biomass at lowest q for each model version
+ref_q <- q_all2 %>%
+  filter(q == min(q_levels)) %>%
+  select(fish_group, version, ref_bm = eq_biomass)
+
+q_depl <- q_all2 %>%
+  left_join(ref_q, by = c("fish_group", "version")) %>%
+  mutate(depletion = eq_biomass / ref_bm)
+
+ggplot(q_depl, aes(x = q, y = depletion,
+                   colour = fish_group, linetype = version)) +
+  geom_line(linewidth = 1.2) + geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", colour = "grey40") +
+  geom_hline(yintercept = 0.2, linetype = "dotted", colour = "red") +
+  annotate("text", x = max(q_levels), y = 0.52,
+           label = "B/B0 = 0.5 (MSY reference)", hjust = 1, size = 3) +
+  annotate("text", x = max(q_levels), y = 0.22,
+           label = "B/B0 = 0.2 (collapsed)", hjust = 1, size = 3, colour = "red") +
+  scale_colour_manual(values = fish_cols) +
+  scale_linetype_manual(values = c("Legacy" = "dashed", "Dual-pathway" = "solid")) +
+  scale_x_log10() +
+  theme_bw() +
+  labs(x = "Catchability (q)",
+       y = expression(B / B[0]),
+       colour = "Fish Group", linetype = "Model",
+       title = "Biomass Depletion Ratio",
+       subtitle = "Legacy (dashed) vs Dual-pathway (solid)")
+```
+
+The dual-pathway model crosses the $B/B_0 = 0.2$ collapse threshold at substantially **lower** catchability than the legacy model predicts. Using the legacy model for stock-status assessments or catch advice would therefore systematically underestimate the risk of overfishing.
+
+## Part 5: Pulse Fishing and Recovery
+
+Perhaps the most ecologically important difference between the two formulations lies in **recovery dynamics**. The legacy model recovers almost instantaneously when fishing stops because the boundary condition immediately restores recruits. The dual-pathway model requires SSB to rebuild before recruitment recovers, producing a characteristic lag that is consistent with empirical observations of recovering fish stocks.
+
+```{r}
+time_pulse  <- seq(0, 300, by = 0.1)
+effort_pulse <- ifelse(time_pulse >= 50 & time_pulse <= 150, 2.0, 0.0)
+
+env_pulse_base <- createInputParams(time = time_pulse, sst = 15, chl = 1.0)
+
+runs_pulse <- run_both(env_pulse_base,
+                       q_small = 0.015, q_med = 0.025, q_large = 0.04,
+                       effort_vec = effort_pulse, isave = 5)
+
+mdl_pulse_leg <- runs_pulse$legacy
+mdl_pulse_new <- runs_pulse$new
+```
+
+```{r fig.height=12}
+effort_df <- data.frame(
+  time   = mdl_pulse_leg$time,
+  effort = approx(time_pulse, effort_pulse, xout = mdl_pulse_leg$time)$y
+)
+
+p_eff <- ggplot(effort_df, aes(x = time, y = effort)) +
+  geom_area(fill = "grey80", alpha = 0.7) + geom_line(linewidth = 0.5) +
+  theme_bw() +
+  labs(x = "Time (years)", y = "Effort", title = "Fishing Effort (Pulse: years 50–150)")
+
+p_pulse_leg <- plotTimeSeries(mdl_pulse_leg, by = "biomass",
+                              species = fish_names, transform = "log10") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "grey40") +
+  ggtitle("Legacy — Fish Biomass")
+
+p_pulse_new <- plotTimeSeries(mdl_pulse_new, by = "biomass",
+                              species = fish_names, transform = "log10") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "grey40") +
+  ggtitle("Dual-pathway — Fish Biomass")
+
+p_ssb_pulse <- plotReproduction(mdl_pulse_new, by = "SSB") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "grey40") +
+  ggtitle("Dual-pathway — SSB")
+
+p_rec_pulse <- plotReproduction(mdl_pulse_new, by = "recruitment") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "grey40") +
+  ggtitle("Dual-pathway — Recruitment")
+
+wrap_plots(p_eff, p_pulse_leg, p_pulse_new, p_ssb_pulse, p_rec_pulse, ncol = 1)
+```
+
+```{r fig.height=7}
+p_fill_leg <- plotTimeSeries(mdl_pulse_leg, by = "biomass", type = "fill") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "black") +
+  annotate("text", x = 25,  y = 0.95, label = "Pre-fishing",  size = 3) +
+  annotate("text", x = 100, y = 0.95, label = "Fishing",      size = 3) +
+  annotate("text", x = 225, y = 0.95, label = "Recovery",     size = 3) +
+  ggtitle("Legacy — Community Composition")
+
+p_fill_new <- plotTimeSeries(mdl_pulse_new, by = "biomass", type = "fill") +
+  geom_vline(xintercept = c(50, 150), linetype = "dashed", colour = "black") +
+  annotate("text", x = 25,  y = 0.95, label = "Pre-fishing",  size = 3) +
+  annotate("text", x = 100, y = 0.95, label = "Fishing",      size = 3) +
+  annotate("text", x = 225, y = 0.95, label = "Recovery",     size = 3) +
+  ggtitle("Dual-pathway — Community Composition")
+
+wrap_plots(p_fill_leg, p_fill_new, ncol = 1, guides = "collect")
+```
+
+In the legacy model, fish biomass begins recovering almost immediately when fishing stops at year 150 — the proportional boundary condition restores recruits at each time step regardless of the adult population state. In the dual-pathway model, SSB must first recover before recruitment increases, and fish biomass shows a prolonged lag that can span decades. This is the biological reality: a depleted stock cannot recruit its way back to equilibrium until enough mature adults survive to spawn.
+
+## Part 6: Overexploitation and Collapse
+
+We now push both models into an overexploited regime to illustrate the most consequential difference: the dual-pathway model can exhibit **irreversible-looking collapse** at sustained high fishing mortality, while the legacy model never truly collapses because the boundary condition continuously replenishes recruits.
+
+```{r}
+time_over <- seq(0, 300, by = 0.1)
+# Heavy fishing from year 50 onwards
+effort_over <- ifelse(time_over >= 50, 5.0, 0.0)
+
+env_over_base <- createInputParams(time = time_over, sst = 15, chl = 1.0)
+
+runs_over <- run_both(env_over_base,
+                      q_small = 0.02, q_med = 0.04, q_large = 0.06,
+                      effort_vec = effort_over, isave = 5)
+
+mdl_over_leg <- runs_over$legacy
+mdl_over_new <- runs_over$new
+```
+
+```{r fig.height=10}
+p_over_leg <- plotTimeSeries(mdl_over_leg, by = "biomass",
+                             species = fish_names, transform = "log10") +
+  geom_vline(xintercept = 50, linetype = "dashed", colour = "grey40") +
+  ggtitle("Legacy — Fish Biomass Under Heavy Fishing") +
+  annotate("text", x = 55, y = -Inf, label = "Fishing starts",
+           hjust = 0, vjust = -0.5, size = 3)
+
+p_over_new <- plotTimeSeries(mdl_over_new, by = "biomass",
+                             species = fish_names, transform = "log10") +
+  geom_vline(xintercept = 50, linetype = "dashed", colour = "grey40") +
+  ggtitle("Dual-pathway — Fish Biomass Under Heavy Fishing") +
+  annotate("text", x = 55, y = -Inf, label = "Fishing starts",
+           hjust = 0, vjust = -0.5, size = 3)
+
+p_ssb_over <- plotReproduction(mdl_over_new, by = "SSB") +
+  geom_vline(xintercept = 50, linetype = "dashed", colour = "grey40") +
+  ggtitle("Dual-pathway — SSB Collapse")
+
+wrap_plots(p_over_leg, p_over_new, p_ssb_over, ncol = 1)
+```
+
+The contrast is stark. Under heavy fishing:
+
+- **Legacy model**: fish biomass declines to a lower level but stabilises, because recruits continue to flow from the boundary condition regardless of adult abundance. The model produces no collapse.
+- **Dual-pathway model**: SSB declines → recruitment collapses → fish biomass falls toward zero, demonstrating a realistic depensation-like dynamic. Without active spawning biomass, the stock cannot self-sustain.
+
+## Part 7: Selective Fishing of Large Fish
+
+Size-selective fishing that targets predominantly large, mature individuals has a disproportionate reproductive impact in the dual-pathway model. In the legacy model, removing large fish has no direct reproductive consequence because recruitment is uncoupled from spawner biomass.
+
+```{r}
+env_large <- createInputParams(time = seq(0, 200, by = 0.1), sst = 15, chl = 1.0)
+
+runs_large <- run_both(env_large,
+                       q_small = 0, q_med = 0, q_large = 0.05,
+                       effort_vec = 1.0, isave = 5)
+
+mdl_large_leg <- runs_large$legacy
+mdl_large_new <- runs_large$new
+```
+
+```{r fig.height=10}
+p_large_leg <- plotTimeSeries(mdl_large_leg, by = "biomass",
+                              species = fish_names, transform = "log10") +
+  ggtitle("Legacy — Large Fish Targeted") + xlim(50, 200)
+
+p_large_new <- plotTimeSeries(mdl_large_new, by = "biomass",
+                              species = fish_names, transform = "log10") +
+  ggtitle("Dual-pathway — Large Fish Targeted") + xlim(50, 200)
+
+p_ssb_large <- plotReproduction(mdl_large_new, by = "SSB") +
+  ggtitle("Dual-pathway — SSB (large fish targeted)") + xlim(50, 200)
+
+p_rec_large <- plotReproduction(mdl_large_new, by = "recruitment") +
+  ggtitle("Dual-pathway — Recruitment (large fish targeted)") + xlim(50, 200)
+
+wrap_plots(p_large_leg, p_large_new, p_ssb_large, p_rec_large, ncol = 1, guides = "collect")
+```
+
+```{r fig.height=6}
+p_repro_large_unf <- plotReproSizeSpectra(mdl_base_new,  n_years = 20) +
+  ggtitle("Dual-pathway — Unfished: Reproductive Rate by Size")
+
+p_repro_large_f   <- plotReproSizeSpectra(mdl_large_new, n_years = 20) +
+  ggtitle("Dual-pathway — Large Fish Targeted: Reproductive Rate by Size")
+
+wrap_plots(p_repro_large_unf, p_repro_large_f, ncol = 1, guides = "collect")
+```
+
+When large fish are selectively removed, the dual-pathway model shows a pronounced reduction in the reproductive rate at large body sizes — precisely the size classes that contribute most to SSB. Medium and small fish may increase (mesopredator release) but their smaller body sizes mean they are less fecund per individual. The legacy model cannot represent any of this because reproduction is not mechanistically linked to adult size structure.
+
+## Summary
+
+This vignette has demonstrated across five fishing scenarios why incorporating explicit stock–recruitment dynamics fundamentally changes ZooMSS model behaviour under exploitation.
+
+| Scenario | Legacy model | Dual-pathway model |
+|---|---|---|
+| Moderate fishing | Biomass declines, stabilises | SSB/recruitment fall; stable new equilibrium |
+| Yield–effort curve | Monotonically flat/increasing | Dome shape; MSY identifiable |
+| Catchability gradient | $B/B_0$ threshold higher | $B/B_0 = 0.2$ crossed at lower $q$ |
+| Pulse fishing recovery | Near-instant recovery | SSB must rebuild; multi-decade lag |
+| Heavy fishing (overexploitation) | Stable depleted state | SSB collapse → recruitment failure |
+| Selective large-fish fishing | No reproductive impact | SSB loss at largest, most fecund sizes |
+
+The core message is that **the legacy model systematically underestimates overfishing risk** because it cannot represent the positive feedback between adult depletion and recruitment failure. For applications where sustainable yield estimation, stock status assessment, or climate-driven change in fish productivity is required — including FishMIP ISIMIP protocols — the dual-pathway formulation is essential.
+
+### Implications for FishMIP Calibration
+
+Because the legacy boundary condition artificially sustains fish populations, calibrating catchability ($q$) against observed catch data using the legacy model will produce $q$ values that are **biased high**: a larger $q$ is needed in the legacy model to reproduce the same catch time series that the dual-pathway model generates with a smaller $q$ through the SSB–recruitment feedback. This bias compounds in climate projection scenarios where productivity changes alter the SSB–recruitment relationship.
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
