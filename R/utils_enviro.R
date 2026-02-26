@@ -35,9 +35,9 @@
 #' }
 #'
 createInputParams <- function(time,
-                          sst,
-                          chl,
-                          cellID = NULL) {
+                              sst,
+                              chl,
+                              cellID = NULL) {
 
   # Load assertthat package for validation
   if (!requireNamespace("assertthat", quietly = TRUE)) {
@@ -183,12 +183,12 @@ createInputParams <- function(time,
 #' )
 #'
 createEnviroData <- function(n_years,
-                                    dt,
-                                    base_sst = 15,
-                                    base_chl = 0.5,
-                                    seasonal = TRUE,
-                                    sst_amplitude = 3,
-                                    chl_amplitude = 0.2) {
+                             dt,
+                             base_sst = 15,
+                             base_chl = 0.5,
+                             seasonal = TRUE,
+                             sst_amplitude = 3,
+                             chl_amplitude = 0.2) {
 
   # Create time vector
   time_years <- seq(0, n_years, by = dt)
