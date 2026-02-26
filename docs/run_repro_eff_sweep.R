@@ -40,7 +40,7 @@ n_years   <- 300
 dt_step   <- 0.1
 sim_time  <- seq(0, n_years, by = dt_step)
 sst_const <- 15
-chl_const <- 0.5
+chl_const <- 0.3
 isave     <- 2
 
 # Effort sweep — finer resolution at low effort where yield curves peak
