@@ -28,6 +28,25 @@ library(zoomss)
 library(ggplot2)
 ```
 
+
+```{r}
+
+plotTimeSeries_exclude <- function(mdl, exclude = NULL, ...) {
+  keep <- setdiff(mdl$param$Groups$Species, exclude)
+  plotTimeSeries(mdl, species = keep, ...)
+}
+
+
+# usage
+p_biomass_vvlow <- plotTimeSeries_exclude(
+  mdl_vvlow,
+  exclude = "Fish_Med",
+  by = "biomass",
+  transform = "log10"
+) + theme(legend.position = "none")
+
+```
+
 ## Input Data
 
 ZooMSS requires two sets of input data:
@@ -44,7 +63,7 @@ Get the default published `Groups` dataframe using:
 ```{r}
 Groups <- getGroups()
 
-Groups$repro_eff[Groups$Type == "Fish"] <- 0.1
+# Groups$repro_eff[Groups$Type == "Fish"] <- 0.1
 
 # Groups$PPMR[Groups$Species == "Fish_Large"] <- 500
 
@@ -73,10 +92,198 @@ Groups[Groups$Type == "Fish", c("Species", "Type", "repro_on","repro_eff", "ZSpr
 Now create an environmental data time-series using the helper function. This time-series uses a constant sea surface temperature (`sst`) and chlorophyll *a*  (`chl`) with a 0.1 yr-1 timestep (`dt`). 
 
 ```{r}
-env_data <- createInputParams(time = seq(0, 200, by = 0.1) ,
+env_data_vvlow <- createInputParams(time = seq(0, 400, by = 0.1) ,
+                              sst = 15,
+                              chl = .01)
+
+env_data_vlow <- createInputParams(time = seq(0, 400, by = 0.1) ,
+                              sst = 15,
+                              chl = .05)
+
+env_data_low <- createInputParams(time = seq(0, 400, by = 0.1) ,
+                              sst = 15,
+                              chl = .1)
+
+env_data_med <- createInputParams(time = seq(0, 400, by = 0.1) ,
+                              sst = 15,
+                              chl = .5)
+
+env_data_high <- createInputParams(time = seq(0, 400, by = 0.1) ,
                               sst = 15,
                               chl = 1)
+```
 
+```{r}
+env_seasonal_vvlow_stoch <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.01,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5,
+  stochastic = TRUE, seed = 123, sst_noise_sd = 0.3, chl_noise_cv = 0.25, ar1_phi = 0.6
+)
+
+env_data_vvlow_seasonal_stoch <- createInputParams(
+  time = env_seasonal_vvlow_stoch$time,
+  sst = env_seasonal_vvlow_stoch$sst,
+  chl = env_seasonal_vvlow_stoch$chl
+)
+
+env_seasonal_vlow_stoch <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.05,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5, 
+  stochastic = TRUE, seed = 123, sst_noise_sd = 0.3, chl_noise_cv = 0.25, ar1_phi = 0.6
+)
+
+env_data_vlow_seasonal_stoch <- createInputParams(
+  time = env_seasonal_vlow_stoch$time,
+  sst = env_seasonal_vlow_stoch$sst,
+  chl = env_seasonal_vlow_stoch$chl
+)
+
+env_seasonal_low_stoch <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.1,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5, 
+  stochastic = TRUE, seed = 123, sst_noise_sd = 0.3, chl_noise_cv = 0.25, ar1_phi = 0.6
+)
+
+env_data_low_seasonal_stoch <- createInputParams(
+  time = env_seasonal_low_stoch$time,
+  sst = env_seasonal_low_stoch$sst,
+  chl = env_seasonal_low_stoch$chl
+)
+
+env_seasonal_med_stoch <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.5,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5, 
+  stochastic = TRUE, seed = 123, sst_noise_sd = 0.3, chl_noise_cv = 0.25, ar1_phi = 0.6
+)
+
+env_data_med_seasonal_stoch <- createInputParams(
+  time = env_seasonal_med_stoch$time,
+  sst = env_seasonal_med_stoch$sst,
+  chl = env_seasonal_med_stoch$chl
+)
+
+# Create seasonal environmental conditions
+env_seasonal_high_stoch <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 1.0,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5, 
+  stochastic = TRUE, seed = 123, sst_noise_sd = 0.3, chl_noise_cv = 0.25, ar1_phi = 0.6
+)
+
+env_data_high_seasonal_stoch <- createInputParams(
+  time = env_seasonal_high_stoch$time,
+  sst = env_seasonal_high_stoch$sst,
+  chl = env_seasonal_high_stoch$chl
+)
+```
+
+
+
+```{r}
+env_seasonal_vvlow <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = .01,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5
+)
+
+env_data_vvlow_seasonal <- createInputParams(
+  time = env_seasonal_vvlow$time,
+  sst = env_seasonal_vvlow$sst,
+  chl = env_seasonal_vvlow$chl
+)
+
+env_seasonal_vlow <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.05,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5
+)
+
+env_data_vlow_seasonal <- createInputParams(
+  time = env_seasonal_vlow$time,
+  sst = env_seasonal_vlow$sst,
+  chl = env_seasonal_vlow$chl
+)
+
+env_seasonal_low <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.1,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5
+)
+
+env_data_low_seasonal <- createInputParams(
+  time = env_seasonal_low$time,
+  sst = env_seasonal_low$sst,
+  chl = env_seasonal_low$chl
+)
+
+env_seasonal_med <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 0.5,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5
+)
+
+env_data_med_seasonal <- createInputParams(
+  time = env_seasonal_med$time,
+  sst = env_seasonal_med$sst,
+  chl = env_seasonal_med$chl
+)
+
+# Create seasonal environmental conditions
+env_seasonal_high <- createEnviroData(
+  n_years = 400,
+  dt = 0.1,
+  base_sst = 15,
+  base_chl = 1.0,
+  seasonal = TRUE,
+  sst_amplitude = 4,
+  chl_amplitude = 0.5
+)
+
+env_data_high_seasonal <- createInputParams(
+  time = env_seasonal_high$time,
+  sst = env_seasonal_high$sst,
+  chl = env_seasonal_high$chl
+)
 ```
 
 We can look at the environment data and check everything is ok with: 
@@ -86,10 +293,28 @@ plotEnvironment(env_data)
 ```
 
 
+```{r}
+mdl_vvlow_seas <- zoomss_model(input_params = env_data_vvlow_seasonal, Groups = Groups, isave = 2)
+mdl_vlow_seas <- zoomss_model(input_params = env_data_vlow_seasonal, Groups = Groups, isave = 2)
+mdl_low_seas <- zoomss_model(input_params = env_data_low_seasonal, Groups = Groups, isave = 2)
+mdl_med_seas <- zoomss_model(input_params = env_data_med_seasonal, Groups = Groups, isave = 2)
+mdl_high_seas <- zoomss_model(input_params = env_data_high_seasonal, Groups = Groups, isave = 2)
+
+mdl_vvlow_seas_stoch <- zoomss_model(input_params = env_data_vvlow_seasonal_stoch, Groups = Groups, isave = 2)
+mdl_vlow_seas_stoch <- zoomss_model(input_params = env_data_vlow_seasonal_stoch, Groups = Groups, isave = 2)
+mdl_low_seas_stoch <- zoomss_model(input_params = env_data_low_seasonal_stoch, Groups = Groups, isave = 2)
+mdl_med_seas_stoch <- zoomss_model(input_params = env_data_med_seasonal_stoch, Groups = Groups, isave = 2)
+mdl_high_seas_stoch <- zoomss_model(input_params = env_data_high_seasonal_stoch, Groups = Groups, isave = 2)
+```
+
+
 Now we run ZooMSS and save every `isave` timestep to reduce storage requirements. 
 ```{r}
-mdl <- zoomss_model(input_params = env_data, Groups = Groups, isave = 2)
-
+mdl_vvlow <- zoomss_model(input_params = env_data_vvlow, Groups = Groups, isave = 2)
+mdl_vlow <- zoomss_model(input_params = env_data_vlow, Groups = Groups, isave = 2)
+mdl_low <- zoomss_model(input_params = env_data_low, Groups = Groups, isave = 2)
+mdl_med <- zoomss_model(input_params = env_data_med, Groups = Groups, isave = 2)
+mdl_high <- zoomss_model(input_params = env_data_high, Groups = Groups, isave = 2)
 ```
 
 ## Plotting
@@ -102,6 +327,139 @@ The model includes several built-in plotting functions for analysis and visualiz
 ```{r}
 library(patchwork)
 
+p_biomass_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+wrap_plots(p_biomass_vvlow, p_fill_vvlow,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow, p_fill_vlow,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low, p_fill_low,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med, p_fill_med,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high,p_fill_high,
+           nrow = 2, guides = "collect")
+```
+```{r}
+library(patchwork)
+
+p_biomass_vvlow <- plotTimeSeries_exclude(
+  mdl_vvlow,
+  exclude = "Fish_Med",
+  by = "biomass",
+  transform = "log10"
+) + theme(legend.position = "none")
+
+p_biomass_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+wrap_plots(p_biomass_vvlow_seas, p_fill_vvlow_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow_seas, p_fill_vlow_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low_seas, p_fill_low_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med_seas, p_fill_med_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high_seas,p_fill_high_seas,
+           nrow = 2, guides = "collect")
+```
+
+```{r}
+library(patchwork)
+
+p_biomass_vvlow_seas_stoch <- plotTimeSeries(mdl_vvlow_seas_stoch, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+p_fill_vvlow_seas_stoch <- plotTimeSeries(mdl_vvlow_seas_stoch, by = "biomass", type = "fill") 
+
+p_biomass_vlow_seas_stoch <- plotTimeSeries(mdl_vlow_seas_stoch, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+p_fill_vlow_seas_stoch <- plotTimeSeries(mdl_vlow_seas_stoch, by = "biomass", type = "fill") 
+
+p_biomass_low_seas_stoch <- plotTimeSeries(mdl_low_seas_stoch, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+p_fill_low_seas_stoch <- plotTimeSeries(mdl_low_seas_stoch, by = "biomass", type = "fill") 
+
+p_biomass_med_seas_stoch <- plotTimeSeries(mdl_med_seas_stoch, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+p_fill_med_seas_stoch <- plotTimeSeries(mdl_med_seas_stoch, by = "biomass", type = "fill") 
+
+p_biomass_high_seas_stoch <- plotTimeSeries(mdl_high_seas_stoch, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+p_fill_high_seas_stoch <- plotTimeSeries(mdl_high_seas_stoch, by = "biomass", type = "fill") 
+
+wrap_plots(p_biomass_vvlow_seas_stoch, p_fill_vvlow_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow_seas_stoch, p_fill_vlow_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low_seas_stoch, p_fill_low_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med_seas_stoch, p_fill_med_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high_seas_stoch,p_fill_high_seas_stoch,
+           nrow = 2, guides = "collect")
+```
+
+
+```{r}
+library(patchwork)
+
 p_biomass <- plotTimeSeries(mdl, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
 
@@ -110,6 +468,16 @@ p_fill <- plotTimeSeries(mdl, by = "biomass", type = "fill")
 wrap_plots(p_biomass, p_fill, nrow = 2, guides = "collect")
 ```
 
+```{r}
+library(patchwork)
+
+p_biomass <- plotTimeSeries(mdl, by = "biomass", transform = "log10") +
+  theme(legend.position = "none")
+
+p_fill <- plotTimeSeries(mdl, by = "biomass", type = "fill") 
+
+wrap_plots(p_biomass, p_fill, nrow = 2, guides = "collect")
+```
 
 These plots display total abundance and mean growth/mortality across all size classes through time.
 

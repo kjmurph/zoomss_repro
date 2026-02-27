@@ -1,0 +1,305 @@
+---
+title: "Fish Reproduction Calibration Diagnostics"
+author: "ZooMSS Calibration Framework"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, warning = FALSE, message = FALSE,
+  fig.width = 10, fig.height = 6
+)
+```
+
+```{r libraries}
+devtools::load_all()
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(tidyr)
+```
+
+# Load Calibration Results
+
+```{r load-results}
+cache_dir <- here::here("calibration_repro_cache")
+calib <- readRDS(file.path(cache_dir, "calibration_results.rds"))
+
+cat("=== Calibration Settings ===\n")
+cat(sprintf("  LHS samples:      %d\n", calib$settings$n_samples))
+cat(sprintf("  SST:              %.0f deg C\n", calib$settings$sst))
+cat(sprintf("  Screening years:  %d\n", calib$settings$screening_years))
+cat(sprintf("  Refinement years: %d\n", calib$settings$refinement_years))
+cat(sprintf("  Best score:       %.4f\n", calib$best$score))
+```
+
+# Part 1: LHS Exploration Overview
+
+## Score Distribution
+
+```{r lhs-scores, fig.height=8}
+lhs <- calib$lhs_results
+
+p1 <- ggplot(lhs, aes(x = score)) +
+  geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
+  geom_vline(xintercept = calib$best$score, colour = "red", linetype = "dashed") +
+  annotate("text", x = calib$best$score, y = Inf, label = "Best",
+           vjust = 2, colour = "red") +
+  theme_bw() +
+  labs(x = "Composite Score", y = "Count", title = "LHS Score Distribution")
+
+metrics <- lhs[, c("coexistence", "stability", "zoo_comp", "fish_ratio", "spectrum")]
+metrics_long <- pivot_longer(metrics, everything(), names_to = "metric", values_to = "value")
+
+p2 <- ggplot(metrics_long, aes(x = metric, y = value)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(x = "Metric", y = "Score (0 = best)", title = "Metric Score Distributions")
+
+p3 <- ggplot(lhs, aes(x = coexistence, y = zoo_comp, colour = score)) +
+  geom_point(alpha = 0.5, size = 1) +
+  scale_colour_viridis_c(option = "plasma", direction = -1) +
+  geom_hline(yintercept = 0.3, linetype = "dashed", colour = "grey50") +
+  geom_vline(xintercept = 0.01, linetype = "dashed", colour = "grey50") +
+  annotate("rect", xmin = 0, xmax = 0.01, ymin = 0, ymax = 0.3,
+           fill = "green", alpha = 0.1) +
+  theme_bw() +
+  labs(x = "Coexistence Penalty", y = "Zoo Composition Penalty",
+       colour = "Score", title = "Filter Region (green = passes both constraints)")
+
+wrap_plots(p1, p2, p3, ncol = 1)
+```
+
+## Parameter Sensitivity
+
+```{r param-sensitivity, fig.height=10}
+param_names <- calib$param_space$name
+plots <- lapply(param_names, function(pn) {
+  if (pn %in% names(lhs)) {
+    ggplot(lhs, aes(x = .data[[pn]], y = score)) +
+      geom_point(alpha = 0.2, size = 0.5) +
+      geom_smooth(method = "loess", se = FALSE, colour = "red") +
+      theme_bw() + labs(title = pn) +
+      theme(plot.title = element_text(size = 9))
+  }
+})
+plots <- plots[!sapply(plots, is.null)]
+wrap_plots(plots, ncol = 3)
+```
+
+# Part 2: Best Calibrated Parameters
+
+```{r best-params}
+best <- calib$best
+par <- best$par
+
+cat("=== Best Parameters ===\n")
+cat("\nShared (all fish groups):\n")
+for (nm in c("PPMR", "FeedWidth", "K_growth", "f_M", "repro_eff")) {
+  cat(sprintf("  %-12s = %.4f\n", nm, par[nm]))
+}
+cat(sprintf("\n  R_frac = 1 - f_M - K_growth = %.4f\n",
+            1 - par["f_M"] - par["K_growth"]))
+
+cat("\nGroup-specific:\n")
+cat(sprintf("  %-12s  Small    Med      Large\n", ""))
+for (base in c("Wmat", "ZSpre", "ZSexp")) {
+  vals <- par[paste0(base, "_", c("S", "M", "L"))]
+  cat(sprintf("  %-12s  %-8.4f %-8.4f %-8.4f\n", base, vals[1], vals[2], vals[3]))
+}
+
+cat("\n=== Metric Breakdown ===\n")
+for (nm in names(best$details$metric_scores)) {
+  cat(sprintf("  %-15s = %.4f\n", nm, best$details$metric_scores[nm]))
+}
+```
+
+# Part 3: Validation Runs
+
+```{r validation-setup}
+benchmark <- calib$benchmark
+chl_levels <- benchmark$chl_levels
+log10_chl <- benchmark$log10_chl
+
+Groups <- getGroups()
+Groups <- apply_repro_params(best$par, Groups)
+
+cache_dir_val <- file.path(cache_dir, "validation")
+if (!dir.exists(cache_dir_val)) dir.create(cache_dir_val, recursive = TRUE)
+
+validation_chl_idx <- seq(1, length(chl_levels), by = 2)
+validation_results <- list()
+
+for (i in validation_chl_idx) {
+  cache_file <- file.path(cache_dir_val, sprintf("val_chl%d.rds", i))
+  if (file.exists(cache_file)) {
+    validation_results[[as.character(i)]] <- readRDS(cache_file)
+  } else {
+    input_params <- createInputParams(
+      time = seq(0, 300, by = 0.1), sst = benchmark$sst, chl = chl_levels[i]
+    )
+    mdl <- zoomss_model(input_params = input_params, Groups = Groups, isave = 2)
+    saveRDS(mdl, cache_file)
+    validation_results[[as.character(i)]] <- mdl
+  }
+}
+```
+
+## Zooplankton Community Composition Comparison
+
+```{r zoo-comparison, fig.height=8}
+zoo_names <- benchmark$zoo_names
+n_zoo <- length(zoo_names)
+
+calib_zoo_prop <- matrix(NA, nrow = length(validation_chl_idx), ncol = n_zoo,
+                         dimnames = list(NULL, zoo_names))
+for (j in seq_along(validation_chl_idx)) {
+  ci <- validation_chl_idx[j]
+  mdl <- validation_results[[as.character(ci)]]
+  avg <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+  zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
+  zoo_bm <- avg[zoo_idx]
+  zoo_total <- sum(zoo_bm)
+  if (zoo_total > 0) calib_zoo_prop[j, ] <- zoo_bm / zoo_total
+}
+
+comp_data <- data.frame()
+for (j in seq_along(validation_chl_idx)) {
+  ci <- validation_chl_idx[j]
+  for (sp in seq_along(zoo_names)) {
+    comp_data <- rbind(comp_data, data.frame(
+      log10_chl = log10_chl[ci], Species = zoo_names[sp],
+      Legacy = benchmark$zoo_proportions[ci, sp],
+      Calibrated = calib_zoo_prop[j, sp]
+    ))
+  }
+}
+
+legacy_long <- comp_data %>%
+  select(log10_chl, Species, proportion = Legacy) %>%
+  mutate(Model = "Legacy (repro_on=0)")
+calib_long <- comp_data %>%
+  select(log10_chl, Species, proportion = Calibrated) %>%
+  mutate(Model = "Calibrated")
+all_comp <- rbind(legacy_long, calib_long)
+all_comp$Species <- factor(all_comp$Species, levels = zoo_names)
+
+Groups_ref <- getGroups()
+zoo_colours <- Groups_ref$PlotColour[Groups_ref$Type == "Zooplankton"]
+names(zoo_colours) <- zoo_names
+
+ggplot(all_comp, aes(x = log10_chl, y = proportion, fill = Species)) +
+  geom_area(position = "stack") +
+  scale_fill_manual(values = zoo_colours) +
+  facet_wrap(~Model, ncol = 1) +
+  theme_bw() +
+  labs(x = expression(log[10](Chlorophyll~a)), y = "Biomass Proportion",
+       title = "Zooplankton Community Composition: Legacy vs Calibrated")
+```
+
+## Fish Biomass Across Gradient
+
+```{r fish-gradient, fig.height=6}
+fish_names <- benchmark$fish_names
+fish_data <- data.frame()
+
+for (j in seq_along(validation_chl_idx)) {
+  ci <- validation_chl_idx[j]
+  mdl <- validation_results[[as.character(ci)]]
+  avg <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+  fish_grps <- mdl$param$fish_grps
+  for (f in seq_along(fish_names)) {
+    fish_data <- rbind(fish_data, data.frame(
+      log10_chl = log10_chl[ci], Fish_Group = fish_names[f],
+      Legacy = benchmark$fish_biomass[ci, f],
+      Calibrated = avg[fish_grps[f]]
+    ))
+  }
+}
+
+fish_long <- fish_data %>%
+  pivot_longer(cols = c(Legacy, Calibrated), names_to = "Model", values_to = "Biomass")
+
+ggplot(fish_long, aes(x = log10_chl, y = log10(pmax(Biomass, 1e-30)),
+                       colour = Fish_Group, linetype = Model)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) + theme_bw() +
+  labs(x = expression(log[10](Chlorophyll~a)), y = expression(log[10](Biomass)),
+       title = "Fish Biomass: Legacy vs Calibrated")
+```
+
+## Biomass Time Series at Representative Chlorophyll Levels
+
+```{r timeseries, fig.height=12}
+repr_idx <- c(1, ceiling(length(validation_chl_idx)/3),
+              ceiling(2*length(validation_chl_idx)/3),
+              length(validation_chl_idx))
+repr_idx <- unique(pmin(repr_idx, length(validation_chl_idx)))
+
+ts_plots <- lapply(repr_idx, function(j) {
+  ci <- validation_chl_idx[j]
+  mdl <- validation_results[[as.character(ci)]]
+  plotTimeSeries(mdl, by = "biomass",
+                 species = c("Fish_Small", "Fish_Med", "Fish_Large"),
+                 transform = "log10") +
+    ggtitle(sprintf("log10(chl) = %.1f", log10_chl[ci])) + xlim(200, 300)
+})
+wrap_plots(ts_plots, ncol = 1)
+```
+
+## Reproduction Diagnostics
+
+```{r repro-diag, fig.height=8}
+mid_j <- ceiling(length(validation_chl_idx) / 2)
+mid_ci <- validation_chl_idx[mid_j]
+mdl_mid <- validation_results[[as.character(mid_ci)]]
+
+p_ssb <- plotReproduction(mdl_mid, by = "SSB") +
+  ggtitle(sprintf("SSB (log10 chl = %.1f)", log10_chl[mid_ci])) + xlim(200, 300)
+p_rec <- plotReproduction(mdl_mid, by = "recruitment") +
+  ggtitle("Recruitment") + xlim(200, 300)
+p_repro <- plotReproduction(mdl_mid, by = "repro_output") +
+  ggtitle("Reproductive Output") + xlim(200, 300)
+
+wrap_plots(p_ssb, p_rec, p_repro, ncol = 1)
+```
+
+# Part 4: Refinement Comparison
+
+```{r refinement-table}
+n_refined <- length(calib$refined)
+ref_summary <- data.frame(
+  Candidate = seq_len(n_refined),
+  Score = sapply(calib$refined, function(x) x$score),
+  Convergence = sapply(calib$refined, function(x) x$convergence)
+)
+for (nm in names(calib$refined[[1]]$details$metric_scores)) {
+  ref_summary[[nm]] <- sapply(calib$refined, function(x) x$details$metric_scores[nm])
+}
+knitr::kable(ref_summary, digits = 4, caption = "Refined candidate comparison")
+```
+
+# Part 5: Post-hoc Yield Curve Validation
+
+```{r yield-curves, fig.height=6}
+yield_data <- yield_curve_validation(
+  par = best$par, fmort_levels = seq(0, 2, by = 0.2),
+  chl = 1.0, sst = benchmark$sst, n_years = 300
+)
+
+ggplot(yield_data, aes(x = Fmort, y = Yield, colour = Fish_Group)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) + theme_bw() +
+  labs(x = "Fishing Mortality (F)", y = "Yield",
+       title = "Yield Curves at Calibrated Parameters (Chl = 1 mg/m3)")
+```
+
+# Session Info
+
+```{r}
+sessionInfo()
+```

@@ -1,0 +1,69 @@
+--- Test 1: Parameter Space Definition ---
+[PASS] param_space is data.frame  
+[PASS] param_space has 14 parameters (got 14) 
+[PASS] param_space has required columns  
+[PASS] all lower < upper  
+[PASS] 5 shared params  
+[PASS] 9 group-specific params  
+--- Test 2: Energy Constraint ---
+[PASS] valid params pass constraint  
+[PASS] invalid params fail constraint  
+[FAIL] edge case (R_frac = 0.05) passes  
+--- Test 3: LHS Sample Generation ---
+[PASS] LHS returns data.frame  
+[PASS] LHS correct dimensions (5 x 14) 
+[PASS] LHS column names match param_space  
+[PASS] all LHS samples satisfy energy constraint  
+[PASS] all LHS values within bounds  
+--- Test 4: apply_repro_params ---
+[PASS] Groups modified is data.frame  
+[PASS] same number of rows  
+[PASS] PPMR applied to all fish (PPMR = 233.9) 
+[PASS] repro_on set to 1  
+[FAIL] zooplankton unchanged  
+--- Test 5: Single Model Run ---
+[PASS] model returns a list  
+[PASS] model has abundance array  
+[PASS] model has biomass array  
+[PASS] biomass is 3D (dim: 150 x 12 x 168) 
+[PASS] model has param$fish_grps  
+[PASS] model has param$dt and param$isave  
+[PASS] biomass dim1 = nsave (time)  
+[PASS] biomass dim2 = ngrps  
+[PASS] biomass dim3 = ngrid (size bins)  
+[PASS] averageTimeSeries returns matrix (dim: 12 x 168) 
+[PASS] avg has ngrps rows  
+[PASS] avg has ngrid cols  
+[PASS] rowSums(avg) gives per-group totals  
+[PASS] fish groups have biomass > 0 (biomass: 2.90e-03, 1.33e-01, 1.40e-02) 
+[PASS] SSB array exists  
+--- Test 6: Legacy Benchmark Generation ---
+[PASS] benchmark is a list  
+[PASS] benchmark has zoo_proportions  
+[PASS] zoo_proportions correct dims (2 x 9) 
+[PASS] zoo proportions sum to ~1  
+[PASS] benchmark has fish_biomass  
+[PASS] benchmark cached to disk  
+--- Test 7: Objective Function ---
+[PASS] objective returns numeric scalar  
+[PASS] score is finite (score = 0.1030) 
+[PASS] detailed result is list  
+[PASS] has score field  
+[PASS] has metric_scores  
+[PASS] 5 metric components (names: coexistence, stability, zoo_comp, fish_ratio, spectrum) 
+[PASS] has per_chl_scores  
+[PASS] all metrics in [0, 1]  
+[PASS] energy violation returns 1e6  
+--- Test 8: LHS Exploration ---
+[PASS] LHS results is data.frame  
+[PASS] LHS results has n_lhs rows (got 5) 
+[PASS] has score column  
+[PASS] has metric columns  
+[PASS] all scores finite  
+[PASS] checkpoint file exists  
+--- Test 9: Candidate Filtering ---
+[PASS] filter returns data.frame  
+[PASS] filter returns <= top_n rows  
+[PASS] filter sorted by score  
+[PASS] strict filter runs without error (1 candidates) 
+--- Test 10: Refinement ---
