@@ -4391,3 +4391,20 @@ Dual-pathway model:
     f_M range:       0.4646257 0.4646257 
     K_growth range:   0.2603037 0.2603037 
     R_frac range:     0.2750706 0.2750706 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4646257 0.4646257 
+    K_growth range:   0.2603037 0.2603037 
+    R_frac range:     0.2750706 0.2750706 
