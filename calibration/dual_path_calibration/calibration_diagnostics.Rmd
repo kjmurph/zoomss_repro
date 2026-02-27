@@ -33,8 +33,12 @@ calib <- readRDS(file.path(cache_dir, "calibration_results.rds"))
 cat("=== Calibration Settings ===\n")
 cat(sprintf("  LHS samples:      %d\n", calib$settings$n_samples))
 cat(sprintf("  SST:              %.0f deg C\n", calib$settings$sst))
+cat(sprintf("  SST amplitude:    %.1f\n", calib$settings$sst_amplitude))
+cat(sprintf("  Chl amplitude:    %.1f\n", calib$settings$chl_amplitude))
+cat(sprintf("  Benchmark years:  %d\n", calib$settings$benchmark_years))
 cat(sprintf("  Screening years:  %d\n", calib$settings$screening_years))
 cat(sprintf("  Refinement years: %d\n", calib$settings$refinement_years))
+cat(sprintf("  Assessment years: %d (final)\n", calib$settings$assess_years))
 cat(sprintf("  Best score:       %.4f\n", calib$best$score))
 ```
 
@@ -126,6 +130,11 @@ for (nm in names(best$details$metric_scores)) {
 benchmark <- calib$benchmark
 chl_levels <- benchmark$chl_levels
 log10_chl <- benchmark$log10_chl
+assess_years <- benchmark$assess_years %||% 100
+
+# Seasonal forcing parameters from benchmark
+sst_amp <- benchmark$sst_amplitude %||% 4
+chl_amp <- benchmark$chl_amplitude %||% 0.5
 
 Groups <- getGroups()
 Groups <- apply_repro_params(best$par, Groups)
@@ -141,8 +150,10 @@ for (i in validation_chl_idx) {
   if (file.exists(cache_file)) {
     validation_results[[as.character(i)]] <- readRDS(cache_file)
   } else {
-    input_params <- createInputParams(
-      time = seq(0, 300, by = 0.1), sst = benchmark$sst, chl = chl_levels[i]
+    input_params <- create_seasonal_input(
+      n_years = 400, dt = 0.1,
+      base_sst = benchmark$sst, base_chl = chl_levels[i],
+      sst_amplitude = sst_amp, chl_amplitude = chl_amp
     )
     mdl <- zoomss_model(input_params = input_params, Groups = Groups, isave = 2)
     saveRDS(mdl, cache_file)
@@ -162,9 +173,10 @@ calib_zoo_prop <- matrix(NA, nrow = length(validation_chl_idx), ncol = n_zoo,
 for (j in seq_along(validation_chl_idx)) {
   ci <- validation_chl_idx[j]
   mdl <- validation_results[[as.character(ci)]]
-  avg <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+  avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
+  avg_total <- rowSums(avg)  # sum across size bins -> per group total
   zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
-  zoo_bm <- avg[zoo_idx]
+  zoo_bm <- avg_total[zoo_idx]
   zoo_total <- sum(zoo_bm)
   if (zoo_total > 0) calib_zoo_prop[j, ] <- zoo_bm / zoo_total
 }
@@ -212,13 +224,14 @@ fish_data <- data.frame()
 for (j in seq_along(validation_chl_idx)) {
   ci <- validation_chl_idx[j]
   mdl <- validation_results[[as.character(ci)]]
-  avg <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+  avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
+  avg_total <- rowSums(avg)  # sum across size bins -> per group total
   fish_grps <- mdl$param$fish_grps
   for (f in seq_along(fish_names)) {
     fish_data <- rbind(fish_data, data.frame(
       log10_chl = log10_chl[ci], Fish_Group = fish_names[f],
       Legacy = benchmark$fish_biomass[ci, f],
-      Calibrated = avg[fish_grps[f]]
+      Calibrated = avg_total[fish_grps[f]]
     ))
   }
 }
@@ -247,7 +260,7 @@ ts_plots <- lapply(repr_idx, function(j) {
   plotTimeSeries(mdl, by = "biomass",
                  species = c("Fish_Small", "Fish_Med", "Fish_Large"),
                  transform = "log10") +
-    ggtitle(sprintf("log10(chl) = %.1f", log10_chl[ci])) + xlim(200, 300)
+    ggtitle(sprintf("log10(chl) = %.1f", log10_chl[ci])) + xlim(300, 400)
 })
 wrap_plots(ts_plots, ncol = 1)
 ```
@@ -260,11 +273,11 @@ mid_ci <- validation_chl_idx[mid_j]
 mdl_mid <- validation_results[[as.character(mid_ci)]]
 
 p_ssb <- plotReproduction(mdl_mid, by = "SSB") +
-  ggtitle(sprintf("SSB (log10 chl = %.1f)", log10_chl[mid_ci])) + xlim(200, 300)
+  ggtitle(sprintf("SSB (log10 chl = %.1f)", log10_chl[mid_ci])) + xlim(300, 400)
 p_rec <- plotReproduction(mdl_mid, by = "recruitment") +
-  ggtitle("Recruitment") + xlim(200, 300)
+  ggtitle("Recruitment") + xlim(300, 400)
 p_repro <- plotReproduction(mdl_mid, by = "repro_output") +
-  ggtitle("Reproductive Output") + xlim(200, 300)
+  ggtitle("Reproductive Output") + xlim(300, 400)
 
 wrap_plots(p_ssb, p_rec, p_repro, ncol = 1)
 ```
@@ -289,7 +302,8 @@ knitr::kable(ref_summary, digits = 4, caption = "Refined candidate comparison")
 ```{r yield-curves, fig.height=6}
 yield_data <- yield_curve_validation(
   par = best$par, fmort_levels = seq(0, 2, by = 0.2),
-  chl = 1.0, sst = benchmark$sst, n_years = 300
+  chl = 1.0, sst = benchmark$sst, n_years = 400,
+  sst_amplitude = sst_amp, chl_amplitude = chl_amp
 )
 
 ggplot(yield_data, aes(x = Fmort, y = Yield, colour = Fish_Group)) +

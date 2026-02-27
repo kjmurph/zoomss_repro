@@ -327,25 +327,25 @@ The model includes several built-in plotting functions for analysis and visualiz
 ```{r}
 library(patchwork)
 
-p_biomass_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+p_biomass_vvlow <- plotTimeSeries(mdl_vvlow, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+p_fill_vvlow <- plotTimeSeries(mdl_vvlow, by = "biomass", type = "fill") 
 
-p_biomass_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+p_biomass_vlow <- plotTimeSeries(mdl_vlow, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+p_fill_vlow <- plotTimeSeries(mdl_vlow, by = "biomass", type = "fill") 
 
-p_biomass_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+p_biomass_low <- plotTimeSeries(mdl_low, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", type = "fill",exclude = "Fish_Med") 
+p_fill_low <- plotTimeSeries(mdl_low, by = "biomass", type = "fill") 
 
-p_biomass_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+p_biomass_med <- plotTimeSeries(mdl_med, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", type = "fill",exclude = "Fish_Med") 
+p_fill_med <- plotTimeSeries(mdl_med, by = "biomass", type = "fill") 
 
-p_biomass_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+p_biomass_high <- plotTimeSeries(mdl_high, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", type = "fill",exclude = "Fish_Med") 
+p_fill_high <- plotTimeSeries(mdl_high, by = "biomass", type = "fill") 
 
 wrap_plots(p_biomass_vvlow, p_fill_vvlow,
            nrow = 2, guides = "collect")
@@ -368,32 +368,25 @@ wrap_plots(
 ```{r}
 library(patchwork)
 
-p_biomass_vvlow <- plotTimeSeries_exclude(
-  mdl_vvlow,
-  exclude = "Fish_Med",
-  by = "biomass",
-  transform = "log10"
-) + theme(legend.position = "none")
-
-p_biomass_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+p_biomass_vvlow_seas <- plotTimeSeries(mdl_vvlow_seas, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+p_fill_vvlow_seas <- plotTimeSeries(mdl_vvlow_seas, by = "biomass", type = "fill") 
 
-p_biomass_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+p_biomass_vlow_seas <- plotTimeSeries(mdl_vlow_seas, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+p_fill_vlow_seas <- plotTimeSeries(mdl_vlow_seas, by = "biomass", type = "fill") 
 
-p_biomass_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+p_biomass_low_seas <- plotTimeSeries(mdl_low_seas, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+p_fill_low_seas <- plotTimeSeries(mdl_low_seas, by = "biomass", type = "fill") 
 
-p_biomass_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+p_biomass_med_seas <- plotTimeSeries(mdl_med_seas, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+p_fill_med_seas <- plotTimeSeries(mdl_med_seas, by = "biomass", type = "fill") 
 
-p_biomass_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+p_biomass_high_seas <- plotTimeSeries(mdl_high_seas, by = "biomass", transform = "log10") +
   theme(legend.position = "none")
-p_fill_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+p_fill_high_seas <- plotTimeSeries(mdl_high_seas, by = "biomass", type = "fill") 
 
 wrap_plots(p_biomass_vvlow_seas, p_fill_vvlow_seas,
            nrow = 2, guides = "collect")
@@ -622,6 +615,198 @@ p_fill <- plotTimeSeries(mdl, by = "biomass", type = "fill")
 
 wrap_plots(p_biomass, p_fill, nrow = 2, guides = "collect")
 ```
+
+### Time Series Analysis
+
+```{r}
+library(patchwork)
+
+p_biomass_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vvlow <- plotTimeSeries_exclude(mdl_vvlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vlow <- plotTimeSeries_exclude(mdl_vlow, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_low <- plotTimeSeries_exclude(mdl_low, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_med <- plotTimeSeries_exclude(mdl_med, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+p_biomass_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", transform = "log10",exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_high <- plotTimeSeries_exclude(mdl_high, by = "biomass", type = "fill",exclude = "Fish_Med") 
+
+wrap_plots(p_biomass_vvlow, p_fill_vvlow,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow, p_fill_vlow,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low, p_fill_low,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med, p_fill_med,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high,p_fill_high,
+           nrow = 2, guides = "collect")
+```
+
+
+```{r}
+library(patchwork)
+
+p_biomass_vvlow <- plotTimeSeries_exclude(
+  mdl_vvlow,
+  exclude = "Fish_Med",
+  by = "biomass",
+  transform = "log10"
+) + theme(legend.position = "none")
+
+p_biomass_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vvlow_seas <- plotTimeSeries_exclude(mdl_vvlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vlow_seas <- plotTimeSeries_exclude(mdl_vlow_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_low_seas <- plotTimeSeries_exclude(mdl_low_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_med_seas <- plotTimeSeries_exclude(mdl_med_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_high_seas <- plotTimeSeries_exclude(mdl_high_seas, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+wrap_plots(p_biomass_vvlow_seas, p_fill_vvlow_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow_seas, p_fill_vlow_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low_seas, p_fill_low_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med_seas, p_fill_med_seas,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high_seas,p_fill_high_seas,
+           nrow = 2, guides = "collect")
+```
+
+
+```{r}
+library(patchwork)
+
+p_biomass_vvlow_seas_stoch <- plotTimeSeries_exclude(mdl_vvlow_seas_stoch, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vvlow_seas_stoch <- plotTimeSeries_exclude(mdl_vvlow_seas_stoch, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_vlow_seas_stoch <- plotTimeSeries_exclude(mdl_vlow_seas_stoch, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_vlow_seas_stoch <- plotTimeSeries_exclude(mdl_vlow_seas_stoch, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_low_seas_stoch <- plotTimeSeries_exclude(mdl_low_seas_stoch, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_low_seas_stoch <- plotTimeSeries_exclude(mdl_low_seas_stoch, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_med_seas_stoch <- plotTimeSeries_exclude(mdl_med_seas_stoch, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_med_seas_stoch <- plotTimeSeries_exclude(mdl_med_seas_stoch, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+p_biomass_high_seas_stoch <- plotTimeSeries_exclude(mdl_high_seas_stoch, by = "biomass", transform = "log10", exclude = "Fish_Med") +
+  theme(legend.position = "none")
+p_fill_high_seas_stoch <- plotTimeSeries_exclude(mdl_high_seas_stoch, by = "biomass", type = "fill", exclude = "Fish_Med") 
+
+wrap_plots(p_biomass_vvlow_seas_stoch, p_fill_vvlow_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(p_biomass_vlow_seas_stoch, p_fill_vlow_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_low_seas_stoch, p_fill_low_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_med_seas_stoch, p_fill_med_seas_stoch,
+           nrow = 2, guides = "collect")
+
+wrap_plots(
+           p_biomass_high_seas_stoch,p_fill_high_seas_stoch,
+           nrow = 2, guides = "collect")
+```
+
+
+
+
+
+
+
+```{r}
+devtools::load_all()
+source("~/GitHub/zoomss_repro/calibration/dual_path_calibration/zoomss_calibration_repro.R")  # adjust path as needed
+
+# --- Does create_seasonal_input survive inside getGroups/apply flow? ---
+Groups <- getGroups()
+par_test <- generate_lhs_samples(n_samples = 1, seed = 42)
+par_vec <- as.numeric(par_test[1, ])
+names(par_vec) <- names(par_test)
+Groups_mod <- apply_repro_params(par_vec, Groups)
+
+ip <- create_seasonal_input(n_years = 30, dt = 0.1,
+                            base_sst = 15, base_chl = 0.1,
+                            sst_amplitude = 4, chl_amplitude = 0.5)
+cat("About to run model with LHS params + seasonal...\n")
+mdl <- zoomss_model(input_params = ip, Groups = Groups_mod, isave = 2)
+cat("Survived single run\n")
+
+# --- Does benchmark generation crash? (sequential, no furrr) ---
+cat("About to run benchmark manually (1 chl level)...\n")
+Groups_leg <- getGroups()
+Groups_leg$repro_on[which(Groups_leg$Type == "Fish")] <- 0L
+ip2 <- create_seasonal_input(n_years = 30, dt = 0.1,
+                             base_sst = 15, base_chl = 1.0,
+                             sst_amplitude = 4, chl_amplitude = 0.5)
+mdl2 <- zoomss_model(input_params = ip2, Groups = Groups_leg, isave = 2)
+cat("Survived benchmark run\n")
+
+# --- Does the furrr parallel path crash? ---
+cat("About to test furrr with 1 worker...\n")
+future::plan(future::multisession, workers = 1)
+res <- furrr::future_map(1, function(i) {
+  devtools::load_all(quiet = TRUE)
+  ip <- create_seasonal_input(n_years = 10, dt = 0.1,
+                              base_sst = 15, base_chl = 1.0,
+                              sst_amplitude = 4, chl_amplitude = 0.5)
+  Groups <- getGroups()
+  mdl <- zoomss_model(input_params = ip, Groups = Groups, isave = 2)
+  "OK"
+}, .options = furrr::furrr_options(seed = TRUE))
+future::plan(future::sequential)
+cat("Survived furrr test:", res[[1]], "\n")
+```
+
+
+
+
+
 
 
 

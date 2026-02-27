@@ -4443,3 +4443,1141 @@ Dual-pathway model:
     f_M range:       0.4646257 0.4646257 
     K_growth range:   0.2603037 0.2603037 
     R_frac range:     0.2750706 0.2750706 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2543758 0.2543758 
+    R_frac range:     0.3249169 0.3249169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2543758 0.2543758 
+    R_frac range:     0.3249169 0.3249169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2523758 0.2523758 
+    R_frac range:     0.3269169 0.3269169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2523758 0.2523758 
+    R_frac range:     0.3269169 0.3269169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4217073 0.4217073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3249169 0.3249169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4217073 0.4217073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3249169 0.3249169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4197073 0.4197073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3269169 0.3269169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4197073 0.4197073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3269169 0.3269169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+final  value 0.022024 
+stopped after 3 iterations
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 0.1 to 0.1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+Averaging final 20 years (100 saved time steps with isave = 2) of abundance from 100 total saved time steps.
+[PASS] refined is a list  
+[PASS] has par vector  
+[PASS] par names preserved  
+[PASS] has score  
+[PASS] has convergence code  
+[PASS] has details with metric_scores  
+  Refined score: 0.0220 (convergence: 1)
+
+--- Test 11: Yield Curve Validation ---
+Using default ZooMSS functional groups. Use getGroups() to customize.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Using static fishing mortality (no effort time series)
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+ZooMSS input parameters created:
+- Time points: 201 (time values provided)
+- Time steps: 200 (intervals to simulate)
+- Time range: 0 to 20 years
+- dt = 0.1 years
+- SST range: 15 to 15 deg C
+- Chlorophyll range: 1 to 1 mg/m^3
+Functional groups validation passed
+Calculating phytoplankton parameters from environmental time series
+Dual-pathway model:
+  Zooplankton: GGE pathway (GrossGEscale * Carbon)
+  Fish: Explicit energy budget
+    f_M range:       0.4207073 0.4207073 
+    K_growth range:   0.2533758 0.2533758 
+    R_frac range:     0.3259169 0.3259169 
+Using static fishing mortality (no effort time series)
+Averaging final 20 years (100 saved time steps with isave = 2) of biomass from 100 total saved time steps.
+[PASS] yield_data is data.frame  
+[PASS] has expected columns  
+[PASS] correct row count (3 F x 3 fish) (got 9) 
+[PASS] yield at F=0 is 0  
+
+--- Test 12: run_repro_calibration wrapper ---
+  (Skipping full wrapper ΓÇö validated via Tests 6-11 individually)
+[PASS] pipeline validated via component tests  
+
+=============================================================
+TEST SUMMARY: 68 PASSED, 2 FAILED (of 70)
+=============================================================
+
+Failed tests:
+   [FAIL] edge case (R_frac = 0.05) passes  
+   [FAIL] zooplankton unchanged  
+
+Test log saved: C:\Users\uqkmur13\AppData\Local\Temp\Rtmpc3NOSZ/zoomss_calib_test/test_log.txt
+Test cache dir: C:\Users\uqkmur13\AppData\Local\Temp\Rtmpc3NOSZ/zoomss_calib_test
+Completed: 2026-02-27 14:29:31.518106
+Error: unexpected '==' in:
+"} else {
+  cat("\n*** ALL TESTS PASSED ΓÇö pipeline ready for calibration ***\n")===="
+Execution halted

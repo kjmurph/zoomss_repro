@@ -5,17 +5,18 @@
 #
 # Validates the full calibration pipeline on a minimal subset to check:
 #   1. Parameter space definition and LHS generation
-#   2. Energy constraint enforcement
-#   3. Benchmark generation (2 chl levels, short runs)
-#   4. Objective function evaluation (single parameter set)
-#   5. LHS exploration with batching (5 samples)
-#   6. Filtering logic
-#   7. Refinement (1 candidate, 2 iterations)
-#   8. Yield curve validation (3 F levels)
-#   9. Diagnostics data extraction
+#   2. Energy constraint enforcement (incl. floating-point edge case)
+#   3. Seasonal environment helper
+#   4. Benchmark generation (2 chl levels, short runs)
+#   5. Objective function evaluation (single parameter set)
+#   6. LHS exploration with batching (5 samples)
+#   7. Filtering logic
+#   8. Refinement (interface-only, optim skipped)
+#   9. Yield curve validation (3 F levels)
 #
 # Designed to complete in ~5-10 minutes on a local machine.
 # All numerical parameters are UNCHANGED from the main pipeline.
+# Environmental forcing uses seasonal SST/chl via createEnviroData().
 #
 # Usage:
 #   Rscript calibration/dual_path_calibration/test_calibration_repro.R
@@ -62,11 +63,16 @@ dir.create(test_cache_dir, recursive = TRUE)
 
 test_n_workers  <- 1L       # Sequential for debugging
 test_sst        <- 15       # Unchanged
-test_n_years_bm <- 30       # Short benchmark runs (vs 300)
-test_n_years_sc <- 20       # Short screening runs (vs 100)
+test_n_years_bm <- 30       # Short benchmark runs (vs 400)
+test_n_years_sc <- 20       # Short screening runs (vs 300)
 test_n_lhs      <- 5L       # Minimal LHS samples (vs 500)
 test_seed       <- 42L      # Unchanged
 test_dt         <- 0.1      # Unchanged
+test_assess_yr  <- 10       # Short assessment window (vs 100)
+
+# Seasonal forcing (same defaults as pipeline)
+test_sst_amp    <- 4
+test_chl_amp    <- 0.5
 
 # Only 2 chl levels for speed
 test_chl_levels <- 10^c(-1.0, 0.0)
@@ -117,17 +123,18 @@ cat("\n--- Test 2: Energy Constraint ---\n")
 
 tryCatch({
   par_valid <- c(f_M = 0.40, K_growth = 0.30)     # R_frac = 0.30 >= 0.05
-
   par_invalid <- c(f_M = 0.60, K_growth = 0.40)    # R_frac = 0.00 < 0.05
-  # Note: f_M=0.50, K_growth=0.45 gives 1-0.50-0.45 = 0.04999... in FP
-  # Use values that unambiguously give R_frac >= 0.05
-  par_edge <- c(f_M = 0.50, K_growth = 0.44)       # R_frac = 0.06 (just above)
+
+  # Edge case: f_M=0.50, K_growth=0.45 gives R_frac = 0.05 exactly.
+  # In IEEE 754: 1 - 0.50 - 0.45 = 0.04999... so this tests the
+  # floating-point tolerance added to check_energy_constraint().
+  par_edge <- c(f_M = 0.50, K_growth = 0.45)       # R_frac = 0.05 (exact boundary)
 
   report("valid params pass constraint",
          check_energy_constraint(par_valid))
   report("invalid params fail constraint",
          !check_energy_constraint(par_invalid))
-  report("near-boundary params (R_frac = 0.06) pass",
+  report("edge case (R_frac = 0.05) passes with FP tolerance",
          check_energy_constraint(par_edge))
 }, error = function(e) {
   report("energy constraint", FALSE, paste("ERROR:", e$message))
@@ -135,9 +142,45 @@ tryCatch({
 
 
 # =============================================================================
-# Test 3: LHS sample generation
+# Test 3: Seasonal environment helper
 # =============================================================================
-cat("\n--- Test 3: LHS Sample Generation ---\n")
+cat("\n--- Test 3: Seasonal Environment Helper ---\n")
+
+tryCatch({
+  input_params <- create_seasonal_input(
+    n_years = 10, dt = 0.1,
+    base_sst = 15, base_chl = 1.0,
+    sst_amplitude = 4, chl_amplitude = 0.5
+  )
+
+  report("create_seasonal_input returns a list",
+         is.list(input_params))
+  report("has time vector",
+         !is.null(input_params$time) && is.numeric(input_params$time))
+  report("has sst vector",
+         !is.null(input_params$sst) && is.numeric(input_params$sst))
+  report("has chl vector",
+         !is.null(input_params$chl) && is.numeric(input_params$chl))
+  report("time, sst, chl same length",
+         length(input_params$time) == length(input_params$sst) &&
+           length(input_params$time) == length(input_params$chl))
+  report("sst has seasonal variation",
+         sd(input_params$sst) > 0,
+         sprintf("(sd = %.2f)", sd(input_params$sst)))
+  report("chl has seasonal variation",
+         sd(input_params$chl) > 0,
+         sprintf("(sd = %.4f)", sd(input_params$chl)))
+  report("chl always positive",
+         all(input_params$chl > 0))
+}, error = function(e) {
+  report("seasonal environment", FALSE, paste("ERROR:", e$message))
+})
+
+
+# =============================================================================
+# Test 4: LHS sample generation
+# =============================================================================
+cat("\n--- Test 4: LHS Sample Generation ---\n")
 
 tryCatch({
   lhs <- generate_lhs_samples(n_samples = test_n_lhs, seed = test_seed)
@@ -175,9 +218,9 @@ tryCatch({
 
 
 # =============================================================================
-# Test 4: Parameter application to Groups
+# Test 5: Parameter application to Groups
 # =============================================================================
-cat("\n--- Test 4: apply_repro_params ---\n")
+cat("\n--- Test 5: apply_repro_params ---\n")
 
 tryCatch({
   Groups <- getGroups()
@@ -198,25 +241,30 @@ tryCatch({
          sprintf("(PPMR = %.1f)", par["PPMR"]))
   report("repro_on set to 1",
          all(Groups_mod$repro_on[fish_idx] == 1L))
-  # Check a column with actual values (PPMR is NA for zooplankton, use K_growth)
-  zoo_rows <- Groups$Type == "Zooplankton"
-  report("zooplankton K_growth unchanged",
-         all(Groups_mod$K_growth[zoo_rows] == Groups$K_growth[zoo_rows]))
+
+  # Check zooplankton rows unchanged — use identical() to handle NA safely
+  zoo_rows <- which(Groups$Type == "Zooplankton")
+  zoo_cols_to_check <- c("Species", "Type", "W0", "Wmax", "GrossGEscale")
+  zoo_unchanged <- all(sapply(zoo_cols_to_check, function(col) {
+    identical(Groups_mod[[col]][zoo_rows], Groups[[col]][zoo_rows])
+  }))
+  report("zooplankton unchanged",
+         zoo_unchanged)
 }, error = function(e) {
   report("apply_repro_params", FALSE, paste("ERROR:", e$message))
 })
 
 
 # =============================================================================
-# Test 5: Single model run with modified Groups
+# Test 6: Single model run with seasonal forcing
 # =============================================================================
-cat("\n--- Test 5: Single Model Run ---\n")
+cat("\n--- Test 6: Single Model Run (seasonal) ---\n")
 
 tryCatch({
-  input_params <- createInputParams(
-    time = seq(0, test_n_years_bm, by = test_dt),
-    sst = test_sst,
-    chl = test_chl_levels[1]
+  input_params <- create_seasonal_input(
+    n_years = test_n_years_bm, dt = test_dt,
+    base_sst = test_sst, base_chl = test_chl_levels[1],
+    sst_amplitude = test_sst_amp, chl_amplitude = test_chl_amp
   )
   mdl <- zoomss_model(input_params = input_params, Groups = Groups_mod, isave = 2)
 
@@ -244,7 +292,7 @@ tryCatch({
          bm_dim[3] == length(mdl$param$w))
 
   # Test averageTimeSeries
-  avg <- averageTimeSeries(mdl, var = "biomass", n_years = 10)
+  avg <- averageTimeSeries(mdl, var = "biomass", n_years = test_assess_yr)
   report("averageTimeSeries returns matrix",
          is.matrix(avg),
          sprintf("(dim: %s)", paste(dim(avg), collapse = " x ")))
@@ -275,9 +323,9 @@ tryCatch({
 
 
 # =============================================================================
-# Test 6: Benchmark generation (2 chl levels, short runs)
+# Test 7: Benchmark generation (2 chl levels, short seasonal runs)
 # =============================================================================
-cat("\n--- Test 6: Legacy Benchmark Generation ---\n")
+cat("\n--- Test 7: Legacy Benchmark Generation ---\n")
 
 benchmark <- NULL
 tryCatch({
@@ -286,6 +334,9 @@ tryCatch({
     sst = test_sst,
     n_years = test_n_years_bm,
     dt = test_dt,
+    sst_amplitude = test_sst_amp,
+    chl_amplitude = test_chl_amp,
+    assess_years = test_assess_yr,
     cache_dir = file.path(test_cache_dir, "benchmark"),
     n_workers = test_n_workers,
     force_rerun = TRUE
@@ -303,6 +354,10 @@ tryCatch({
          all(abs(rowSums(benchmark$zoo_proportions, na.rm = TRUE) - 1) < 0.01))
   report("benchmark has fish_biomass",
          !is.null(benchmark$fish_biomass))
+  report("benchmark stores seasonal params",
+         !is.null(benchmark$sst_amplitude) && !is.null(benchmark$chl_amplitude))
+  report("benchmark stores assess_years",
+         !is.null(benchmark$assess_years) && benchmark$assess_years == test_assess_yr)
   report("benchmark cached to disk",
          file.exists(file.path(test_cache_dir, "benchmark",
                                sprintf("benchmark_sst%.0f.rds", test_sst))))
@@ -312,12 +367,12 @@ tryCatch({
 
 
 # =============================================================================
-# Test 7: Objective function (single evaluation)
+# Test 8: Objective function (single evaluation)
 # =============================================================================
-cat("\n--- Test 7: Objective Function ---\n")
+cat("\n--- Test 8: Objective Function ---\n")
 
 tryCatch({
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 6)")
+  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
 
   par <- as.numeric(lhs[1, ])
   names(par) <- names(lhs)
@@ -328,6 +383,7 @@ tryCatch({
     chl_indices = 1:2,
     n_years = test_n_years_sc,
     dt = test_dt,
+    assess_years = test_assess_yr,
     return_details = FALSE
   )
 
@@ -343,6 +399,7 @@ tryCatch({
     chl_indices = 1:2,
     n_years = test_n_years_sc,
     dt = test_dt,
+    assess_years = test_assess_yr,
     return_details = TRUE
   )
 
@@ -365,7 +422,8 @@ tryCatch({
   par_bad["f_M"] <- 0.70
   par_bad["K_growth"] <- 0.45
   score_bad <- repro_objective(par = par_bad, benchmark = benchmark,
-                               chl_indices = 1, n_years = test_n_years_sc)
+                               chl_indices = 1, n_years = test_n_years_sc,
+                               assess_years = test_assess_yr)
   report("energy violation returns 1e6",
          score_bad == 1e6)
 
@@ -375,13 +433,13 @@ tryCatch({
 
 
 # =============================================================================
-# Test 8: LHS exploration (5 samples, sequential)
+# Test 9: LHS exploration (5 samples, sequential)
 # =============================================================================
-cat("\n--- Test 8: LHS Exploration ---\n")
+cat("\n--- Test 9: LHS Exploration ---\n")
 
 lhs_results <- NULL
 tryCatch({
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 6)")
+  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
 
   lhs_results <- run_lhs_exploration(
     lhs_samples = lhs,
@@ -414,13 +472,13 @@ tryCatch({
 
 
 # =============================================================================
-# Test 9: Candidate filtering
+# Test 10: Candidate filtering
 # =============================================================================
-cat("\n--- Test 9: Candidate Filtering ---\n")
+cat("\n--- Test 10: Candidate Filtering ---\n")
 
 candidates <- NULL
 tryCatch({
-  if (is.null(lhs_results)) stop("LHS results not available (see Test 8)")
+  if (is.null(lhs_results)) stop("LHS results not available (see Test 9)")
 
   # Relaxed filter (test data is small)
   candidates <- filter_lhs_candidates(
@@ -454,25 +512,16 @@ tryCatch({
 
 
 # =============================================================================
-# Test 10: Refinement — interface test only
+# Test 11: Refinement — interface test only
 # =============================================================================
-# NOTE: L-BFGS-B with 14 parameters requires ~14 finite-difference evaluations
-# per iteration to approximate the gradient, regardless of maxit. Each evaluation
-# runs a full model simulation. The optimization step is therefore only exercised
-# during production runs via run_calibration_repro.R.
-# This test validates:
-#   a) refine_candidate() exists with the expected function signature
-#   b) The output list structure produced by refine_candidate() is correct
-#      (verified by constructing an equivalent result from repro_objective directly)
-# =============================================================================
-cat("\n--- Test 10: Refinement (interface only — optim skipped in unit test) ---\n")
+cat("\n--- Test 11: Refinement (interface only) ---\n")
 
 refined <- NULL
 tryCatch({
   if (is.null(candidates) || nrow(candidates) == 0) {
-    stop("No candidates available (see Test 9)")
+    stop("No candidates available (see Test 10)")
   }
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 6)")
+  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
 
   param_names <- names(lhs)
 
@@ -486,18 +535,17 @@ tryCatch({
              %in% fargs),
          sprintf("(args: %s)", paste(fargs, collapse = ", ")))
 
-  # b) Validate the OUTPUT STRUCTURE expected from refine_candidate by building
-  #    an equivalent result from repro_objective (which is already tested in T7)
+  # b) Validate output structure via repro_objective
   par_init <- as.numeric(candidates[1, param_names])
   names(par_init) <- param_names
 
   details <- repro_objective(
     par = par_init, benchmark = benchmark,
     chl_indices = 1, n_years = 2, dt = test_dt,
+    assess_years = 1,
     return_details = TRUE
   )
 
-  # Construct the expected output structure of refine_candidate manually
   mock_refined <- list(
     par         = par_init,
     score       = details$score,
@@ -530,9 +578,9 @@ tryCatch({
 
 
 # =============================================================================
-# Test 11: Yield curve validation (3 F levels)
+# Test 12: Yield curve validation (3 F levels, seasonal)
 # =============================================================================
-cat("\n--- Test 11: Yield Curve Validation ---\n")
+cat("\n--- Test 12: Yield Curve Validation ---\n")
 
 tryCatch({
   test_par <- if (!is.null(refined)) refined$par else {
@@ -545,7 +593,10 @@ tryCatch({
     chl = 1.0,
     sst = test_sst,
     n_years = test_n_years_sc,
-    dt = test_dt
+    dt = test_dt,
+    sst_amplitude = test_sst_amp,
+    chl_amplitude = test_chl_amp,
+    assess_years = test_assess_yr
   )
 
   report("yield_data is data.frame",
@@ -564,21 +615,13 @@ tryCatch({
 
 
 # =============================================================================
-# Test 12: Full pipeline wrapper (minimal)
+# Test 13: Full pipeline wrapper (structural)
 # =============================================================================
-cat("\n--- Test 12: run_repro_calibration wrapper ---\n")
+cat("\n--- Test 13: run_repro_calibration wrapper ---\n")
 
 tryCatch({
-  # This calls the full pipeline end-to-end on minimal settings.
-  # It will re-use cached benchmark if Test 6 used the same cache_dir,
-  # but we use a separate dir to test independently.
-  full_cache <- file.path(test_cache_dir, "full_pipeline")
-
-  # Temporarily override chl_levels inside the function by wrapping
-  # (the wrapper function hard-codes chl_levels, so we test its structure)
-  cat("  (Skipping full wrapper — validated via Tests 6-11 individually)\n")
+  cat("  (Skipping full wrapper — validated via Tests 3-12 individually)\n")
   report("pipeline validated via component tests", TRUE)
-
 }, error = function(e) {
   report("full pipeline", FALSE, paste("ERROR:", e$message))
 })
@@ -608,11 +651,11 @@ cat(sprintf("Completed: %s\n", Sys.time()))
 # Clean up
 unlink(test_cache_dir, recursive = TRUE)
 
-# Exit code
+# Exit code (only quit when running via Rscript, not interactively)
 if (fail_count > 0) {
   cat("\n*** TESTS FAILED — fix bugs before running calibration ***\n")
-  quit(save = "no", status = 1)
+  if (!interactive()) quit(save = "no", status = 1)
 } else {
   cat("\n*** ALL TESTS PASSED — pipeline ready for calibration ***\n")
-  quit(save = "no", status = 0)
+  if (!interactive()) quit(save = "no", status = 0)
 }

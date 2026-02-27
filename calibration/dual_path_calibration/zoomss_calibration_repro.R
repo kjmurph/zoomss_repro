@@ -17,6 +17,9 @@
 #   Total free dimensions: 14
 #
 # Energy budget constraint: f_M + K_growth + R_frac = 1, R_frac >= 0.05
+#
+# Environmental forcing: Seasonal SST and chl via createEnviroData().
+# All simulations use seasonal forcing for realism and stability.
 # =============================================================================
 
 
@@ -108,15 +111,56 @@ apply_repro_params <- function(par, Groups, param_space = repro_param_space()) {
 
 #' Enforce energy budget constraint: R_frac >= min_rfrac
 #'
+#' Includes a small tolerance (default 1e-10) to handle IEEE 754
+#' floating-point arithmetic edge cases, e.g. 1 - 0.50 - 0.45 = 0.04999...
+#'
 #' @param par Named numeric vector
 #' @param min_rfrac Minimum R_frac (default 0.05)
+#' @param tol Floating-point tolerance (default 1e-10)
 #' @return Logical: TRUE if constraint satisfied
 #' @export
-check_energy_constraint <- function(par, min_rfrac = 0.05) {
+check_energy_constraint <- function(par, min_rfrac = 0.05, tol = 1e-10) {
   f_M <- par["f_M"]
   K_growth <- par["K_growth"]
   R_frac <- 1 - f_M - K_growth
-  R_frac >= min_rfrac
+  R_frac >= (min_rfrac - tol)
+}
+
+
+# --- Seasonal Environment Helper ---------------------------------------------
+
+#' Create seasonal environmental forcing for a given chl level
+#'
+#' Wraps createEnviroData() + createInputParams() into a single call.
+#' This ensures all calibration runs use consistent seasonal forcing.
+#'
+#' @param n_years Simulation length in years
+#' @param dt Time step (default 0.1)
+#' @param base_sst Base SST (default 15)
+#' @param base_chl Base chlorophyll concentration (mg/m^3)
+#' @param sst_amplitude SST seasonal amplitude (default 4)
+#' @param chl_amplitude Chl seasonal amplitude (default 0.5)
+#' @return Input parameters list for zoomss_model()
+#' @export
+create_seasonal_input <- function(n_years, dt = 0.1,
+                                  base_sst = 15, base_chl = 1.0,
+                                  sst_amplitude = 4, chl_amplitude = 0.5) {
+
+  env_data <- createEnviroData(
+    n_years       = n_years,
+    dt            = dt,
+    base_sst      = base_sst,
+    base_chl      = base_chl,
+    seasonal      = TRUE,
+    sst_amplitude = sst_amplitude,
+    chl_amplitude = chl_amplitude
+  )
+
+  createInputParams(
+    time = env_data$time,
+    sst  = env_data$sst,
+    chl  = env_data$chl
+  )
 }
 
 
@@ -126,11 +170,15 @@ check_energy_constraint <- function(par, min_rfrac = 0.05) {
 #'
 #' Runs the model with fish reproduction disabled to establish
 #' calibration targets for zooplankton community composition.
+#' Uses seasonal environmental forcing for realism and stability.
 #'
 #' @param chl_levels Numeric vector of chlorophyll concentrations (mg/m^3)
-#' @param sst Numeric, sea surface temperature (default 15)
-#' @param n_years Numeric, simulation length in years (default 300)
+#' @param sst Numeric, base sea surface temperature (default 15)
+#' @param n_years Numeric, simulation length in years (default 400)
 #' @param dt Numeric, time step (default 0.1)
+#' @param sst_amplitude SST seasonal amplitude (default 4)
+#' @param chl_amplitude Chl seasonal amplitude (default 0.5)
+#' @param assess_years Final N years for metric extraction (default 100)
 #' @param cache_dir Character, directory for caching results
 #' @param n_workers Integer, number of parallel workers (default 14)
 #' @param force_rerun Logical, re-run even if cache exists
@@ -138,8 +186,11 @@ check_energy_constraint <- function(par, min_rfrac = 0.05) {
 #' @export
 generate_legacy_benchmark <- function(chl_levels,
                                       sst = 15,
-                                      n_years = 300,
+                                      n_years = 400,
                                       dt = 0.1,
+                                      sst_amplitude = 4,
+                                      chl_amplitude = 0.5,
+                                      assess_years = 100,
                                       cache_dir = NULL,
                                       n_workers = 14,
                                       force_rerun = FALSE) {
@@ -156,7 +207,8 @@ generate_legacy_benchmark <- function(chl_levels,
   }
 
   message("Generating legacy benchmark: ", length(chl_levels),
-          " chl levels at SST = ", sst, "\u00b0C")
+          " chl levels at SST = ", sst, "\u00b0C (seasonal, ",
+          n_years, "yr, assess final ", assess_years, "yr)")
 
   # Groups with reproduction OFF
   Groups <- getGroups()
@@ -174,15 +226,17 @@ generate_legacy_benchmark <- function(chl_levels,
                             sprintf("legacy_sst%.0f_chl%.4f.rds", sst, log10(chl)))
     if (file.exists(cache_file) && !force_rerun) return(readRDS(cache_file))
 
-    input_params <- createInputParams(
-      time = seq(0, n_years, by = dt), sst = sst, chl = chl
+    input_params <- create_seasonal_input(
+      n_years = n_years, dt = dt,
+      base_sst = sst, base_chl = chl,
+      sst_amplitude = sst_amplitude, chl_amplitude = chl_amplitude
     )
     mdl <- zoomss_model(input_params = input_params, Groups = Groups, isave = 2)
     saveRDS(mdl, cache_file)
     mdl
   }, .options = furrr::furrr_options(seed = TRUE), .progress = TRUE)
 
-  # Extract metrics
+  # Extract metrics from final assess_years
   n_chl <- length(chl_levels)
   zoo_names <- Groups$Species[Groups$Type == "Zooplankton"]
   fish_names <- Groups$Species[Groups$Type == "Fish"]
@@ -194,7 +248,7 @@ generate_legacy_benchmark <- function(chl_levels,
 
   for (i in seq_along(results)) {
     mdl <- results[[i]]
-    avg <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+    avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
     avg_total <- rowSums(avg)  # sum across size bins -> vector of length ngrps
     zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
     zoo_bm <- avg_total[zoo_idx]
@@ -207,7 +261,8 @@ generate_legacy_benchmark <- function(chl_levels,
     sst = sst, chl_levels = chl_levels, log10_chl = log10(chl_levels),
     zoo_proportions = zoo_proportions, fish_biomass = fish_biomass,
     zoo_names = zoo_names, fish_names = fish_names,
-    n_years = n_years, dt = dt
+    n_years = n_years, dt = dt, assess_years = assess_years,
+    sst_amplitude = sst_amplitude, chl_amplitude = chl_amplitude
   )
   saveRDS(benchmark, benchmark_file)
   message("Benchmark saved: ", benchmark_file)
@@ -219,14 +274,16 @@ generate_legacy_benchmark <- function(chl_levels,
 
 #' Evaluate a parameter set across multiple chlorophyll levels
 #'
-#' Core objective function. Runs the model at each chl level and
-#' computes a composite score (lower is better).
+#' Core objective function. Runs the model at each chl level with seasonal
+#' forcing and computes a composite score (lower is better).
+#' Assessment uses the final assess_years of the simulation.
 #'
 #' @param par Named numeric vector of parameter values
 #' @param benchmark Output of generate_legacy_benchmark()
 #' @param chl_indices Integer vector of indices to evaluate
-#' @param n_years Simulation length (default 100 for screening)
+#' @param n_years Simulation length (default 300)
 #' @param dt Time step (default 0.1)
+#' @param assess_years Final N years for metric extraction (default 100)
 #' @param weights Named list of objective weights
 #' @param return_details If TRUE, return detailed diagnostics
 #' @return Numeric scalar or list if return_details = TRUE
@@ -234,8 +291,9 @@ generate_legacy_benchmark <- function(chl_levels,
 repro_objective <- function(par,
                             benchmark,
                             chl_indices = NULL,
-                            n_years = 100,
+                            n_years = 300,
                             dt = 0.1,
+                            assess_years = 100,
                             weights = NULL,
                             return_details = FALSE) {
 
@@ -252,7 +310,6 @@ repro_objective <- function(par,
   if (is.null(chl_indices)) chl_indices <- seq_along(benchmark$chl_levels)
 
   # Energy constraint check
-
   if (!check_energy_constraint(par)) {
     if (return_details) return(list(score = 1e6, reason = "energy_constraint_violated"))
     return(1e6)
@@ -260,6 +317,10 @@ repro_objective <- function(par,
 
   Groups <- getGroups()
   Groups <- apply_repro_params(par, Groups)
+
+  # Seasonal forcing parameters from benchmark (with fallback defaults)
+  sst_amp <- if (!is.null(benchmark$sst_amplitude)) benchmark$sst_amplitude else 4
+  chl_amp <- if (!is.null(benchmark$chl_amplitude)) benchmark$chl_amplitude else 0.5
 
   n_eval <- length(chl_indices)
   scores <- data.frame(
@@ -277,16 +338,18 @@ repro_objective <- function(par,
     chl <- benchmark$chl_levels[ci]
 
     tryCatch({
-      input_params <- createInputParams(
-        time = seq(0, n_years, by = dt), sst = benchmark$sst, chl = chl
+      input_params <- create_seasonal_input(
+        n_years = n_years, dt = dt,
+        base_sst = benchmark$sst, base_chl = chl,
+        sst_amplitude = sst_amp, chl_amplitude = chl_amp
       )
       mdl <- zoomss_model(input_params = input_params, Groups = Groups, isave = 2)
 
-      # Final 50 years
+      # Final assess_years
       n_save <- length(mdl$time)
       dt_save <- mdl$param$isave * mdl$param$dt
-      n_50yr <- min(n_save, round(50 / dt_save))
-      start_idx <- max(1, n_save - n_50yr + 1)
+      n_assess <- min(n_save, round(assess_years / dt_save))
+      start_idx <- max(1, n_save - n_assess + 1)
 
       fish_grps <- mdl$param$fish_grps
       zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
@@ -317,7 +380,7 @@ repro_objective <- function(par,
       scores$stability[j] <- mean(cv_penalty)
 
       # 3. ZOO COMPOSITION (correlation with legacy)
-      avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = 50)
+      avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
       avg_bm_total <- rowSums(avg_bm)  # sum across size bins -> per group total
       zoo_bm <- avg_bm_total[zoo_idx]
       zoo_total <- sum(zoo_bm)
@@ -349,7 +412,8 @@ repro_objective <- function(par,
       }
 
       # 5. SIZE SPECTRUM SLOPE
-      all_abundance <- averageTimeSeries(mdl, var = "abundance", n_years = 50)
+      all_abundance <- averageTimeSeries(mdl, var = "abundance",
+                                         n_years = assess_years)
       w_vec <- mdl$param$w
       total_abund <- colSums(all_abundance)  # sum across groups -> per size bin
       valid <- total_abund > 0
@@ -447,7 +511,7 @@ generate_lhs_samples <- function(n_samples = 500,
 #' @param lhs_samples data.frame from generate_lhs_samples()
 #' @param benchmark Output of generate_legacy_benchmark()
 #' @param chl_indices Indices of representative chl levels
-#' @param n_years Simulation length for screening (default 100)
+#' @param n_years Simulation length for screening (default 300)
 #' @param n_workers Number of parallel workers (default 14)
 #' @param cache_dir Directory for caching results
 #' @param batch_size Samples per batch (default 50)
@@ -456,7 +520,7 @@ generate_lhs_samples <- function(n_samples = 500,
 run_lhs_exploration <- function(lhs_samples,
                                 benchmark,
                                 chl_indices = NULL,
-                                n_years = 100,
+                                n_years = 300,
                                 n_workers = 14,
                                 cache_dir = NULL,
                                 batch_size = 50) {
@@ -572,7 +636,7 @@ filter_lhs_candidates <- function(lhs_results,
 #' @param par_init Named numeric vector (starting point)
 #' @param benchmark Output of generate_legacy_benchmark()
 #' @param chl_indices Indices for evaluation (NULL = all)
-#' @param n_years Simulation length (default 200)
+#' @param n_years Simulation length (default 400)
 #' @param param_space Output of repro_param_space()
 #' @param maxit Maximum L-BFGS-B iterations (default 50)
 #' @return List with optimised parameters and diagnostics
@@ -580,7 +644,7 @@ filter_lhs_candidates <- function(lhs_results,
 refine_candidate <- function(par_init,
                              benchmark,
                              chl_indices = NULL,
-                             n_years = 200,
+                             n_years = 400,
                              param_space = repro_param_space(),
                              maxit = 50) {
 
@@ -619,18 +683,26 @@ refine_candidate <- function(par_init,
 
 #' Generate yield curves for a calibrated parameter set
 #'
+#' Uses seasonal environmental forcing consistent with calibration.
+#'
 #' @param par Named numeric vector of calibrated parameters
 #' @param fmort_levels Numeric vector of fishing mortality rates
 #' @param chl Chlorophyll concentration (mg/m^3, default 1.0)
-#' @param sst SST (default 15)
-#' @param n_years Simulation length (default 300)
+#' @param sst Base SST (default 15)
+#' @param n_years Simulation length (default 400)
 #' @param dt Time step (default 0.1)
+#' @param sst_amplitude SST seasonal amplitude (default 4)
+#' @param chl_amplitude Chl seasonal amplitude (default 0.5)
+#' @param assess_years Final N years for assessment (default 100)
 #' @return data.frame with Fmort, Fish_Group, Biomass, Yield
 #' @export
 yield_curve_validation <- function(par,
                                    fmort_levels = seq(0, 2, by = 0.1),
                                    chl = 1.0, sst = 15,
-                                   n_years = 300, dt = 0.1) {
+                                   n_years = 400, dt = 0.1,
+                                   sst_amplitude = 4,
+                                   chl_amplitude = 0.5,
+                                   assess_years = 100) {
 
   Groups <- getGroups()
   Groups <- apply_repro_params(par, Groups)
@@ -639,19 +711,23 @@ yield_curve_validation <- function(par,
   results <- data.frame()
 
   for (fm in fmort_levels) {
-    input_params <- createInputParams(
-      time = seq(0, n_years, by = dt), sst = sst, chl = chl
+    input_params <- create_seasonal_input(
+      n_years = n_years, dt = dt,
+      base_sst = sst, base_chl = chl,
+      sst_amplitude = sst_amplitude, chl_amplitude = chl_amplitude
     )
     mdl_Groups <- Groups
     if ("Fmort" %in% names(mdl_Groups)) mdl_Groups$Fmort[fish_idx] <- fm
 
     tryCatch({
       mdl <- zoomss_model(input_params = input_params, Groups = mdl_Groups, isave = 2)
-      avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = 100)
+      avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
+      avg_bm_total <- rowSums(avg_bm)  # sum across size bins -> per group total
       for (f in seq_along(fish_names)) {
         results <- rbind(results, data.frame(
           Fmort = fm, Fish_Group = fish_names[f],
-          Biomass = avg_bm[fish_idx[f]], Yield = fm * avg_bm[fish_idx[f]],
+          Biomass = avg_bm_total[fish_idx[f]],
+          Yield = fm * avg_bm_total[fish_idx[f]],
           stringsAsFactors = FALSE
         ))
       }
@@ -673,14 +749,18 @@ yield_curve_validation <- function(par,
 #' Run the complete calibration pipeline
 #'
 #' Orchestrates benchmark generation, LHS exploration, filtering,
-#' and L-BFGS-B refinement.
+#' and L-BFGS-B refinement. All runs use seasonal environmental forcing.
 #'
 #' @param n_samples LHS samples (default 500)
 #' @param n_workers Parallel workers (default 14)
 #' @param cache_dir Base cache directory
-#' @param sst Temperature (default 15)
-#' @param screening_years LHS screening run length (default 100)
-#' @param refinement_years Refinement run length (default 200)
+#' @param sst Base temperature (default 15)
+#' @param sst_amplitude SST seasonal amplitude (default 4)
+#' @param chl_amplitude Chl seasonal amplitude (default 0.5)
+#' @param benchmark_years Benchmark simulation length (default 400)
+#' @param screening_years LHS screening run length (default 300)
+#' @param refinement_years Refinement run length (default 400)
+#' @param assess_years Final years for metric extraction (default 100)
 #' @param top_n_refine Candidates to refine (default 5)
 #' @param seed Random seed
 #' @return List with all calibration results
@@ -689,8 +769,12 @@ run_repro_calibration <- function(n_samples = 500,
                                   n_workers = 14,
                                   cache_dir = "calibration_repro_cache",
                                   sst = 15,
-                                  screening_years = 100,
-                                  refinement_years = 200,
+                                  sst_amplitude = 4,
+                                  chl_amplitude = 0.5,
+                                  benchmark_years = 400,
+                                  screening_years = 300,
+                                  refinement_years = 400,
+                                  assess_years = 100,
                                   top_n_refine = 5,
                                   seed = 42) {
 
@@ -703,6 +787,8 @@ run_repro_calibration <- function(n_samples = 500,
 
   benchmark <- generate_legacy_benchmark(
     chl_levels = chl_levels, sst = sst,
+    n_years = benchmark_years, assess_years = assess_years,
+    sst_amplitude = sst_amplitude, chl_amplitude = chl_amplitude,
     n_workers = n_workers,
     cache_dir = file.path(cache_dir, "benchmark")
   )
@@ -746,8 +832,12 @@ run_repro_calibration <- function(n_samples = 500,
     best = refined[[which.min(sapply(refined, function(x) x$score))]],
     param_space = repro_param_space(),
     settings = list(n_samples = n_samples, sst = sst,
+                    sst_amplitude = sst_amplitude,
+                    chl_amplitude = chl_amplitude,
+                    benchmark_years = benchmark_years,
                     screening_years = screening_years,
-                    refinement_years = refinement_years, seed = seed)
+                    refinement_years = refinement_years,
+                    assess_years = assess_years, seed = seed)
   )
 
   saveRDS(calibration, file.path(cache_dir, "calibration_results.rds"))
