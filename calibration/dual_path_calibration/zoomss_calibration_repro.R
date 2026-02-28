@@ -3,10 +3,13 @@
 # =============================================================================
 #
 # Calibrates dual-pathway fish energy budget parameters to achieve:
-#   1. Coexistence: All 3 fish groups persist across chl gradient
+#   1. Coexistence: All 3 fish groups persist across chl gradient (threshold 1e-6)
 #   2. Stability: Oscillating steady-state (bounded CV)
 #   3. Zoo conservation: Zooplankton composition matches legacy model
 #   4. Biological realism: Parameters within literature-defensible ranges
+#   5. Fish trend: No declining fish biomass (heading to extinction)
+#   6. Zoo persistence: All zoo groups retain >= 10% of benchmark biomass
+#      (relative to benchmark, so robust across the chl gradient)
 #
 # Architecture: LHS exploration -> filter -> L-BFGS-B refinement
 # Follows pattern from zoomss_calibration.R (fishing mortality calibration)
@@ -262,6 +265,8 @@ generate_legacy_benchmark <- function(chl_levels,
 
   zoo_proportions <- matrix(NA, nrow = n_chl, ncol = length(zoo_names),
                             dimnames = list(NULL, zoo_names))
+  zoo_biomass <- matrix(NA, nrow = n_chl, ncol = length(zoo_names),
+                        dimnames = list(NULL, zoo_names))
   fish_biomass <- matrix(NA, nrow = n_chl, ncol = length(fish_names),
                          dimnames = list(NULL, fish_names))
 
@@ -272,13 +277,15 @@ generate_legacy_benchmark <- function(chl_levels,
     zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
     zoo_bm <- avg_total[zoo_idx]
     zoo_total <- sum(zoo_bm)
+    zoo_biomass[i, ] <- zoo_bm
     if (zoo_total > 0) zoo_proportions[i, ] <- zoo_bm / zoo_total
     fish_biomass[i, ] <- avg_total[mdl$param$fish_grps]
   }
 
   benchmark <- list(
     sst = sst, chl_levels = chl_levels, log10_chl = log10(chl_levels),
-    zoo_proportions = zoo_proportions, fish_biomass = fish_biomass,
+    zoo_proportions = zoo_proportions, zoo_biomass = zoo_biomass,
+    fish_biomass = fish_biomass,
     zoo_names = zoo_names, fish_names = fish_names,
     n_years = n_years, dt = dt, assess_years = assess_years,
     sst_amplitude = sst_amplitude, chl_amplitude = chl_amplitude
@@ -296,6 +303,15 @@ generate_legacy_benchmark <- function(chl_levels,
 #' Runs the model at each chl level with seasonal forcing and computes a
 #' composite score (lower is better). Assessment uses the final assess_years.
 #' Enforces energy budget (per group) and Wmat ordering constraints.
+#'
+#' Metrics:
+#'   1. Coexistence:     Fish mean biomass > 1e-6 (functionally present)
+#'   2. Stability:       CV of fish biomass bounded
+#'   3. Zoo composition: Correlation with legacy zoo proportions
+#'   4. Fish ratio:      Log-ratio of fish biomass to legacy
+#'   5. Spectrum slope:  Negative slope of size spectrum
+#'   6. Fish trend:      Penalise declining fish biomass (heading to extinction)
+#'   7. Zoo persistence: Penalise zoo groups dropping below 10% of benchmark
 #'
 #' @param par Named numeric vector of parameter values
 #' @param benchmark Output of generate_legacy_benchmark()
@@ -322,7 +338,9 @@ repro_objective <- function(par,
       stability       = 1.0,
       zoo_composition = 3.0,
       fish_ratio      = 0.0,
-      spectrum_slope  = 1.0
+      spectrum_slope  = 1.0,
+      fish_trend      = 3.0,
+      zoo_persistence = 3.0
     )
   }
 
@@ -352,7 +370,9 @@ repro_objective <- function(par,
     stability   = rep(NA_real_, n_eval),
     zoo_comp    = rep(NA_real_, n_eval),
     fish_ratio  = rep(NA_real_, n_eval),
-    spectrum    = rep(NA_real_, n_eval)
+    spectrum    = rep(NA_real_, n_eval),
+    fish_trend  = rep(NA_real_, n_eval),
+    zoo_persist = rep(NA_real_, n_eval)
   )
 
   for (j in seq_along(chl_indices)) {
@@ -375,22 +395,26 @@ repro_objective <- function(par,
       fish_grps <- mdl$param$fish_grps
       zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
       n_fish <- length(fish_grps)
+      n_zoo  <- length(zoo_idx)
 
-      # 1. COEXISTENCE
+      # --- 1. COEXISTENCE (threshold: 1e-6 = functionally present) ---
       fish_mean_bm <- sapply(seq_len(n_fish), function(f) {
         bm_slice <- mdl$biomass[start_idx:n_save, fish_grps[f], , drop = FALSE]
         mean(rowSums(bm_slice, dims = 2), na.rm = TRUE)
       })
-      coexist_frac <- mean(fish_mean_bm > 1e-20)
+      coexist_frac <- mean(fish_mean_bm > 1e-6)
       scores$coexistence[j] <- 1 - coexist_frac
 
-      # 2. STABILITY (CV bounded)
-      fish_cv <- sapply(seq_len(n_fish), function(f) {
+      # --- 2. STABILITY (CV bounded) ---
+      fish_ts <- lapply(seq_len(n_fish), function(f) {
         bm_slice <- mdl$biomass[start_idx:n_save, fish_grps[f], , drop = FALSE]
-        bm <- rowSums(bm_slice, dims = 2)
-        bm <- bm[bm > 0]
-        if (length(bm) < 10) return(Inf)
-        sd(bm) / mean(bm)
+        rowSums(bm_slice, dims = 2)
+      })
+
+      fish_cv <- sapply(fish_ts, function(bm) {
+        bm_pos <- bm[bm > 0]
+        if (length(bm_pos) < 10) return(Inf)
+        sd(bm_pos) / mean(bm_pos)
       })
       cv_penalty <- sapply(fish_cv, function(cv) {
         if (is.infinite(cv) || is.na(cv)) return(1)
@@ -400,7 +424,7 @@ repro_objective <- function(par,
       })
       scores$stability[j] <- mean(cv_penalty)
 
-      # 3. ZOO COMPOSITION (correlation with legacy)
+      # --- 3. ZOO COMPOSITION (correlation with legacy) ---
       avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
       avg_bm_total <- rowSums(avg_bm)
       zoo_bm <- avg_bm_total[zoo_idx]
@@ -418,7 +442,7 @@ repro_objective <- function(par,
         scores$zoo_comp[j] <- 1
       }
 
-      # 4. FISH BIOMASS RATIO
+      # --- 4. FISH BIOMASS RATIO ---
       bench_fish <- benchmark$fish_biomass[ci, ]
       model_fish <- avg_bm_total[fish_grps]
       if (all(bench_fish > 0) && all(model_fish > 0)) {
@@ -432,7 +456,7 @@ repro_objective <- function(par,
         scores$fish_ratio[j] <- 0.5
       }
 
-      # 5. SIZE SPECTRUM SLOPE
+      # --- 5. SIZE SPECTRUM SLOPE ---
       all_abundance <- averageTimeSeries(mdl, var = "abundance",
                                          n_years = assess_years)
       w_vec <- mdl$param$w
@@ -452,12 +476,60 @@ repro_objective <- function(par,
         scores$spectrum[j] <- 0.5
       }
 
+      # --- 6. FISH TREND (penalise declining biomass) ---
+      # Fit linear regression to log10(biomass) over assessment window.
+      # A negative slope indicates the group is heading to extinction.
+      # Penalty scales with the magnitude of decline.
+      time_assess <- mdl$time[start_idx:n_save]
+      time_norm <- time_assess - min(time_assess)  # normalise to 0-based
+
+      trend_penalties <- sapply(seq_len(n_fish), function(f) {
+        bm <- fish_ts[[f]]
+        if (all(bm <= 0)) return(1)
+        # Use log10 of positive values; mark zeros as floor
+        bm_floor <- pmax(bm, 1e-30)
+        log_bm <- log10(bm_floor)
+        # Fit slope: decline per year
+        fit <- lm(log_bm ~ time_norm)
+        slope_per_yr <- coef(fit)[2]
+        if (is.na(slope_per_yr)) return(1)
+        # No penalty for stable or increasing
+        if (slope_per_yr >= -0.001) return(0)
+        # Penalty proportional to decline rate (cap at 1)
+        # -0.01 per year = ~1 OOM per 100yr = moderate decline
+        # -0.1 per year = ~1 OOM per 10yr = severe decline
+        min(1, abs(slope_per_yr) / 0.05)
+      })
+      scores$fish_trend[j] <- mean(trend_penalties)
+
+      # --- 7. ZOO PERSISTENCE (relative to benchmark) ---
+      # Each zoo group should retain at least 10% of its benchmark biomass.
+      # Penalty is proportional to how far below the threshold it falls.
+      # Uses relative comparison so it works across chl gradient.
+      bench_zoo <- benchmark$zoo_biomass[ci, ]
+      if (!is.null(bench_zoo) && all(!is.na(bench_zoo)) && all(bench_zoo > 0)) {
+        zoo_ratios <- zoo_bm / bench_zoo
+        zoo_penalties <- sapply(zoo_ratios, function(r) {
+          if (is.na(r) || !is.finite(r)) return(1)
+          if (r >= 0.10) return(0)           # >= 10% of benchmark: OK
+          if (r <= 0.001) return(1)          # < 0.1%: effectively extinct
+          # Linear penalty between 0.1% and 10%
+          1 - (log10(r) - log10(0.001)) / (log10(0.10) - log10(0.001))
+        })
+        scores$zoo_persist[j] <- mean(zoo_penalties)
+      } else {
+        # No benchmark available (e.g. old cache without zoo_biomass)
+        scores$zoo_persist[j] <- 0
+      }
+
     }, error = function(e) {
       scores$coexistence[j] <<- 1
       scores$stability[j]   <<- 1
       scores$zoo_comp[j]    <<- 1
       scores$fish_ratio[j]  <<- 1
       scores$spectrum[j]    <<- 1
+      scores$fish_trend[j]  <<- 1
+      scores$zoo_persist[j] <<- 1
     })
   }
 
@@ -466,10 +538,13 @@ repro_objective <- function(par,
     stability   = mean(scores$stability, na.rm = TRUE),
     zoo_comp    = mean(scores$zoo_comp, na.rm = TRUE),
     fish_ratio  = mean(scores$fish_ratio, na.rm = TRUE),
-    spectrum    = mean(scores$spectrum, na.rm = TRUE)
+    spectrum    = mean(scores$spectrum, na.rm = TRUE),
+    fish_trend  = mean(scores$fish_trend, na.rm = TRUE),
+    zoo_persist = mean(scores$zoo_persist, na.rm = TRUE)
   )
   w <- c(weights$coexistence, weights$stability, weights$zoo_composition,
-         weights$fish_ratio, weights$spectrum_slope)
+         weights$fish_ratio, weights$spectrum_slope,
+         weights$fish_trend, weights$zoo_persistence)
   composite <- sum(metric_scores * w) / sum(w)
 
   if (return_details) {
@@ -622,6 +697,8 @@ run_lhs_exploration <- function(lhs_samples,
         zoo_comp    = result$metric_scores["zoo_comp"],
         fish_ratio  = result$metric_scores["fish_ratio"],
         spectrum    = result$metric_scores["spectrum"],
+        fish_trend  = result$metric_scores["fish_trend"],
+        zoo_persist = result$metric_scores["zoo_persist"],
         t(par), stringsAsFactors = FALSE
       )
     }, .options = furrr::furrr_options(seed = TRUE), .progress = TRUE)
@@ -648,12 +725,22 @@ run_lhs_exploration <- function(lhs_samples,
 filter_lhs_candidates <- function(lhs_results,
                                   max_coexistence = 0.01,
                                   max_zoo_comp = 0.3,
+                                  max_fish_trend = 0.2,
+                                  max_zoo_persist = 0.3,
                                   max_score = NULL,
                                   top_n = 20) {
 
   candidates <- lhs_results[
     lhs_results$coexistence <= max_coexistence &
     lhs_results$zoo_comp <= max_zoo_comp, ]
+
+  # Apply new metric filters if columns exist
+  if ("fish_trend" %in% names(candidates)) {
+    candidates <- candidates[candidates$fish_trend <= max_fish_trend, ]
+  }
+  if ("zoo_persist" %in% names(candidates)) {
+    candidates <- candidates[candidates$zoo_persist <= max_zoo_persist, ]
+  }
 
   if (!is.null(max_score)) candidates <- candidates[candidates$score <= max_score, ]
   candidates <- candidates[order(candidates$score), ]

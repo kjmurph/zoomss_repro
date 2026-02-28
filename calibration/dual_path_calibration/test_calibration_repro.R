@@ -255,9 +255,14 @@ tryCatch({
     chl_indices = 1:2, n_years = test_n_years_sc, dt = test_dt,
     assess_years = test_assess_yr, return_details = TRUE)
   report("returns list with score", is.list(result) && is.numeric(result$score))
-  report("5 metrics in [0,1]",
-         length(result$metric_scores) == 5 &&
-           all(result$metric_scores >= 0 & result$metric_scores <= 1))
+  report("7 metrics",
+         length(result$metric_scores) == 7,
+         sprintf("(got %d: %s)", length(result$metric_scores),
+                 paste(names(result$metric_scores), collapse=", ")))
+  report("all metrics in [0,1]",
+         all(result$metric_scores >= 0 & result$metric_scores <= 1))
+  report("fish_trend metric present", "fish_trend" %in% names(result$metric_scores))
+  report("zoo_persist metric present", "zoo_persist" %in% names(result$metric_scores))
 
   # Energy violation (one group)
   par_bad <- par; par_bad["f_M_L"] <- 0.70; par_bad["K_growth_L"] <- 0.45

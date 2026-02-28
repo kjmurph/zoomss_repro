@@ -58,7 +58,8 @@ p1 <- ggplot(lhs, aes(x = score)) +
   theme_bw() +
   labs(x = "Composite Score", y = "Count", title = "LHS Score Distribution")
 
-metrics <- lhs[, c("coexistence", "stability", "zoo_comp", "fish_ratio", "spectrum")]
+metrics <- lhs[, c("coexistence", "stability", "zoo_comp", "fish_ratio",
+                    "spectrum", "fish_trend", "zoo_persist")]
 metrics_long <- pivot_longer(metrics, everything(), names_to = "metric", values_to = "value")
 
 p2 <- ggplot(metrics_long, aes(x = metric, y = value)) +

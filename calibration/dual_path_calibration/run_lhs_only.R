@@ -109,14 +109,23 @@ cat(sprintf("  Median score:      %.4f\n", median(lhs_results$score)))
 
 n_coexist <- sum(lhs_results$coexistence <= 0.01)
 n_zoo     <- sum(lhs_results$zoo_comp <= 0.3)
-n_both    <- sum(lhs_results$coexistence <= 0.01 & lhs_results$zoo_comp <= 0.3)
+n_trend   <- sum(lhs_results$fish_trend <= 0.2)
+n_zpersist <- sum(lhs_results$zoo_persist <= 0.3)
+n_all     <- sum(lhs_results$coexistence <= 0.01 &
+                  lhs_results$zoo_comp <= 0.3 &
+                  lhs_results$fish_trend <= 0.2 &
+                  lhs_results$zoo_persist <= 0.3)
 cat(sprintf("  Coexistence pass:  %d / %d\n", n_coexist, nrow(lhs_results)))
 cat(sprintf("  Zoo comp pass:     %d / %d\n", n_zoo, nrow(lhs_results)))
-cat(sprintf("  Both pass:         %d / %d\n", n_both, nrow(lhs_results)))
+cat(sprintf("  Fish trend pass:   %d / %d\n", n_trend, nrow(lhs_results)))
+cat(sprintf("  Zoo persist pass:  %d / %d\n", n_zpersist, nrow(lhs_results)))
+cat(sprintf("  All pass:          %d / %d\n", n_all, nrow(lhs_results)))
 
-if (n_both > 0) {
+if (n_all > 0) {
   top5 <- head(lhs_results[lhs_results$coexistence <= 0.01 &
-                            lhs_results$zoo_comp <= 0.3, ], 5)
+                            lhs_results$zoo_comp <= 0.3 &
+                            lhs_results$fish_trend <= 0.2 &
+                            lhs_results$zoo_persist <= 0.3, ], 5)
   top5 <- top5[order(top5$score), ]
   cat("\n  Top 5 candidates:\n")
   for (i in seq_len(nrow(top5))) {
