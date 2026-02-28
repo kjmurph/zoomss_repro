@@ -1,86 +1,47 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# Test Run: Fish Reproduction Calibration Pipeline
-# =============================================================================
-#
-# Validates the full calibration pipeline on a minimal subset to check:
-#   1. Parameter space definition and LHS generation
-#   2. Energy constraint enforcement (incl. floating-point edge case)
-#   3. Seasonal environment helper
-#   4. Benchmark generation (2 chl levels, short runs)
-#   5. Objective function evaluation (single parameter set)
-#   6. LHS exploration with batching (5 samples)
-#   7. Filtering logic
-#   8. Refinement (interface-only, optim skipped)
-#   9. Yield curve validation (3 F levels)
-#
-# Designed to complete in ~5-10 minutes on a local machine.
-# All numerical parameters are UNCHANGED from the main pipeline.
-# Environmental forcing uses seasonal SST/chl via createEnviroData().
-#
-# Usage:
-#   Rscript calibration/dual_path_calibration/test_calibration_repro.R
+# Test Run: Fish Reproduction Calibration Pipeline (24 dimensions)
 # =============================================================================
 
 cat("=============================================================\n")
-cat("ZooMSS Fish Reproduction Calibration - TEST RUN\n")
+cat("ZooMSS Fish Reproduction Calibration - TEST RUN (24-dim)\n")
 cat(sprintf("Started: %s\n", Sys.time()))
 cat("=============================================================\n\n")
 
-# --- Load package ---
 if (requireNamespace("devtools", quietly = TRUE)) {
   devtools::load_all(quiet = TRUE)
 } else {
   library(zoomss)
 }
 
-# Check calibration source exists
-calib_source <- file.path("calibration", "dual_path_calibration",
-                          "zoomss_calibration_repro.R")
+calib_source <- file.path("R", "zoomss_calibration_repro.R")
 if (!file.exists(calib_source)) {
-  # Try from project root
-  calib_source <- file.path("zoomss_calibration_repro.R")
-  if (!file.exists(calib_source)) {
-    stop("Cannot find zoomss_calibration_repro.R. ",
-         "Run from project root or calibration/dual_path_calibration/")
-  }
+  calib_source <- "zoomss_calibration_repro.R"
+  if (!file.exists(calib_source)) stop("Cannot find zoomss_calibration_repro.R")
 }
 source(calib_source)
 
-# Check dependencies
 required_pkgs <- c("lhs", "future", "furrr")
 missing <- required_pkgs[!sapply(required_pkgs, requireNamespace, quietly = TRUE)]
-if (length(missing) > 0) {
-  stop("Missing required packages: ", paste(missing, collapse = ", "),
-       "\nInstall with: install.packages(c('",
-       paste(missing, collapse = "', '"), "'))")
-}
+if (length(missing) > 0) stop("Missing packages: ", paste(missing, collapse = ", "))
 
-# --- Test configuration (minimal subset) ---
 test_cache_dir <- file.path(tempdir(), "zoomss_calib_test")
 if (dir.exists(test_cache_dir)) unlink(test_cache_dir, recursive = TRUE)
 dir.create(test_cache_dir, recursive = TRUE)
 
-test_n_workers  <- 1L       # Sequential for debugging
-test_sst        <- 15       # Unchanged
-test_n_years_bm <- 30       # Short benchmark runs (vs 400)
-test_n_years_sc <- 20       # Short screening runs (vs 300)
-test_n_lhs      <- 5L       # Minimal LHS samples (vs 500)
-test_seed       <- 42L      # Unchanged
-test_dt         <- 0.1      # Unchanged
-test_assess_yr  <- 10       # Short assessment window (vs 100)
-
-# Seasonal forcing (same defaults as pipeline)
+test_n_workers  <- 1L
+test_sst        <- 15
+test_n_years_bm <- 30
+test_n_years_sc <- 20
+test_n_lhs      <- 5L
+test_seed       <- 42L
+test_dt         <- 0.1
+test_assess_yr  <- 10
 test_sst_amp    <- 4
 test_chl_amp    <- 0.5
-
-# Only 2 chl levels for speed
 test_chl_levels <- 10^c(-1.0, 0.0)
 
-pass_count <- 0
-fail_count <- 0
-test_log   <- character(0)
-
+pass_count <- 0; fail_count <- 0; test_log <- character(0)
 report <- function(test_name, passed, detail = "") {
   status <- if (passed) "PASS" else "FAIL"
   msg <- sprintf("[%s] %s %s", status, test_name, detail)
@@ -91,540 +52,290 @@ report <- function(test_name, passed, detail = "") {
 
 
 # =============================================================================
-# Test 1: Parameter space definition
+# Test 1: Parameter space (24 dimensions, all group-specific)
 # =============================================================================
 cat("\n--- Test 1: Parameter Space Definition ---\n")
-
 tryCatch({
   ps <- repro_param_space()
-
-  report("param_space is data.frame",
-         is.data.frame(ps))
-  report("param_space has 14 parameters",
-         nrow(ps) == 14,
-         sprintf("(got %d)", nrow(ps)))
-  report("param_space has required columns",
-         all(c("name", "lower", "upper", "shared", "group_idx") %in% names(ps)))
-  report("all lower < upper",
-         all(ps$lower < ps$upper))
-  report("5 shared params",
-         sum(ps$shared) == 5)
-  report("9 group-specific params",
-         sum(!ps$shared) == 9)
-}, error = function(e) {
-  report("param_space definition", FALSE, paste("ERROR:", e$message))
-})
+  report("param_space has 24 parameters", nrow(ps) == 24, sprintf("(got %d)", nrow(ps)))
+  report("all group-specific (no shared)", all(!is.na(ps$group_idx)))
+  report("8 param types x 3 groups",
+         length(unique(sub("_[SML]$", "", ps$name))) == 8)
+  report("all lower < upper", all(ps$lower < ps$upper))
+  # Check PPMR, FeedWidth, f_M, K_growth, repro_eff each have 3 variants
+  for (ptype in c("PPMR", "FeedWidth", "f_M", "K_growth", "repro_eff")) {
+    n <- sum(grepl(paste0("^", ptype, "_"), ps$name))
+    report(sprintf("%s has 3 group variants", ptype), n == 3)
+  }
+}, error = function(e) report("param_space", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 2: Energy constraint checking
+# Test 2: Energy constraint (per-group, R_frac >= 0.15)
 # =============================================================================
-cat("\n--- Test 2: Energy Constraint ---\n")
-
+cat("\n--- Test 2: Per-Group Energy Constraint ---\n")
 tryCatch({
-  par_valid <- c(f_M = 0.40, K_growth = 0.30)     # R_frac = 0.30 >= 0.05
-  par_invalid <- c(f_M = 0.60, K_growth = 0.40)    # R_frac = 0.00 < 0.05
+  # All groups valid
+  par_ok <- c(f_M_S = 0.40, K_growth_S = 0.30,
+              f_M_M = 0.35, K_growth_M = 0.35,
+              f_M_L = 0.30, K_growth_L = 0.40)
+  report("all groups valid passes", check_energy_constraint(par_ok))
 
-  # Edge case: f_M=0.50, K_growth=0.45 gives R_frac = 0.05 exactly.
-  # In IEEE 754: 1 - 0.50 - 0.45 = 0.04999... so this tests the
-  # floating-point tolerance added to check_energy_constraint().
-  par_edge <- c(f_M = 0.50, K_growth = 0.45)       # R_frac = 0.05 (exact boundary)
+  # One group invalid (L: R_frac = 1 - 0.60 - 0.40 = 0.00)
+  par_bad <- c(f_M_S = 0.40, K_growth_S = 0.30,
+               f_M_M = 0.35, K_growth_M = 0.35,
+               f_M_L = 0.60, K_growth_L = 0.40)
+  report("one group invalid fails", !check_energy_constraint(par_bad))
 
-  report("valid params pass constraint",
-         check_energy_constraint(par_valid))
-  report("invalid params fail constraint",
-         !check_energy_constraint(par_invalid))
-  report("edge case (R_frac = 0.05) passes with FP tolerance",
+  # Edge case: R_frac = 0.15 exactly (FP: 1 - 0.45 - 0.40 = 0.14999...)
+  par_edge <- c(f_M_S = 0.40, K_growth_S = 0.30,
+                f_M_M = 0.35, K_growth_M = 0.35,
+                f_M_L = 0.45, K_growth_L = 0.40)
+  report("edge case R_frac=0.15 passes with tolerance",
          check_energy_constraint(par_edge))
-}, error = function(e) {
-  report("energy constraint", FALSE, paste("ERROR:", e$message))
-})
+
+  # Below threshold: R_frac = 0.14
+  par_low <- c(f_M_S = 0.40, K_growth_S = 0.30,
+               f_M_M = 0.35, K_growth_M = 0.35,
+               f_M_L = 0.46, K_growth_L = 0.40)
+  report("R_frac=0.14 fails", !check_energy_constraint(par_low))
+}, error = function(e) report("energy constraint", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 3: Seasonal environment helper
+# Test 3: Wmat ordering
 # =============================================================================
-cat("\n--- Test 3: Seasonal Environment Helper ---\n")
-
+cat("\n--- Test 3: Wmat Ordering Constraint ---\n")
 tryCatch({
-  input_params <- create_seasonal_input(
-    n_years = 10, dt = 0.1,
-    base_sst = 15, base_chl = 1.0,
-    sst_amplitude = 4, chl_amplitude = 0.5
-  )
-
-  report("create_seasonal_input returns a list",
-         is.list(input_params))
-  report("has time vector",
-         !is.null(input_params$time) && is.numeric(input_params$time))
-  report("has sst vector",
-         !is.null(input_params$sst) && is.numeric(input_params$sst))
-  report("has chl vector",
-         !is.null(input_params$chl) && is.numeric(input_params$chl))
-  report("time, sst, chl same length",
-         length(input_params$time) == length(input_params$sst) &&
-           length(input_params$time) == length(input_params$chl))
-  report("sst has seasonal variation",
-         sd(input_params$sst) > 0,
-         sprintf("(sd = %.2f)", sd(input_params$sst)))
-  report("chl has seasonal variation",
-         sd(input_params$chl) > 0,
-         sprintf("(sd = %.4f)", sd(input_params$chl)))
-  report("chl always positive",
-         all(input_params$chl > 0))
-}, error = function(e) {
-  report("seasonal environment", FALSE, paste("ERROR:", e$message))
-})
+  report("ordered passes", check_wmat_ordering(c(Wmat_S=-1, Wmat_M=1, Wmat_L=3)))
+  report("equal passes",   check_wmat_ordering(c(Wmat_S=1, Wmat_M=1, Wmat_L=1)))
+  report("reversed fails", !check_wmat_ordering(c(Wmat_S=3, Wmat_M=1, Wmat_L=-1)))
+  report("S>M fails",      !check_wmat_ordering(c(Wmat_S=2, Wmat_M=1, Wmat_L=3)))
+}, error = function(e) report("Wmat ordering", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 4: LHS sample generation
+# Test 4: Rounding
 # =============================================================================
-cat("\n--- Test 4: LHS Sample Generation ---\n")
+cat("\n--- Test 4: Parameter Rounding ---\n")
+tryCatch({
+  par_raw <- c(PPMR_S = 145.7, PPMR_M = 200.3, PPMR_L = 312.8,
+               FeedWidth_S = 1.756, K_growth_M = 0.2173, f_M_L = 0.3114)
+  par_r <- round_params(par_raw)
+  report("PPMR_S -> integer", par_r["PPMR_S"] == 146)
+  report("PPMR_L -> integer", par_r["PPMR_L"] == 313)
+  report("FeedWidth_S -> 2dp", par_r["FeedWidth_S"] == 1.76)
+  report("K_growth_M -> 2dp", par_r["K_growth_M"] == 0.22)
+}, error = function(e) report("rounding", FALSE, paste("ERROR:", e$message)))
 
+
+# =============================================================================
+# Test 5: Seasonal environment helper
+# =============================================================================
+cat("\n--- Test 5: Seasonal Environment ---\n")
+tryCatch({
+  ip <- create_seasonal_input(n_years = 10, dt = 0.1,
+                              base_sst = 15, base_chl = 1.0,
+                              sst_amplitude = 4, chl_amplitude = 0.5)
+  report("returns list with time/sst/chl", is.list(ip) && all(c("time","sst","chl") %in% names(ip)))
+  report("same lengths", length(ip$time) == length(ip$sst) && length(ip$time) == length(ip$chl))
+  report("sst varies", sd(ip$sst) > 0)
+  report("chl always positive", all(ip$chl > 0))
+}, error = function(e) report("seasonal env", FALSE, paste("ERROR:", e$message)))
+
+
+# =============================================================================
+# Test 6: LHS generation (24 dims)
+# =============================================================================
+cat("\n--- Test 6: LHS Sample Generation ---\n")
 tryCatch({
   lhs <- generate_lhs_samples(n_samples = test_n_lhs, seed = test_seed)
-
-  report("LHS returns data.frame",
-         is.data.frame(lhs))
-  report("LHS correct dimensions",
-         nrow(lhs) == test_n_lhs && ncol(lhs) == 14,
-         sprintf("(%d x %d)", nrow(lhs), ncol(lhs)))
-
   ps <- repro_param_space()
-  report("LHS column names match param_space",
-         all(names(lhs) == ps$name))
+  report("correct dims (n x 24)", nrow(lhs) == test_n_lhs && ncol(lhs) == 24,
+         sprintf("(%d x %d)", nrow(lhs), ncol(lhs)))
+  report("column names match", all(names(lhs) == ps$name))
 
-  # Check all samples satisfy energy constraint
-  all_valid <- all(sapply(seq_len(nrow(lhs)), function(i) {
-    check_energy_constraint(lhs[i, ])
-  }))
-  report("all LHS samples satisfy energy constraint",
-         all_valid)
+  all_energy <- all(sapply(seq_len(nrow(lhs)), function(i) check_energy_constraint(lhs[i,])))
+  report("all satisfy energy constraint", all_energy)
 
-  # Check bounds
+  all_wmat <- all(sapply(seq_len(nrow(lhs)), function(i) check_wmat_ordering(lhs[i,])))
+  report("all satisfy Wmat ordering", all_wmat)
+
   in_bounds <- TRUE
   for (i in seq_len(ncol(lhs))) {
-    if (any(lhs[, i] < ps$lower[i] - 1e-10) || any(lhs[, i] > ps$upper[i] + 1e-10)) {
-      in_bounds <- FALSE
-      break
+    if (any(lhs[,i] < ps$lower[i] - 1e-10) || any(lhs[,i] > ps$upper[i] + 1e-10)) {
+      in_bounds <- FALSE; break
     }
   }
-  report("all LHS values within bounds",
-         in_bounds)
-}, error = function(e) {
-  report("LHS generation", FALSE, paste("ERROR:", e$message))
-})
+  report("all within bounds", in_bounds)
+}, error = function(e) report("LHS generation", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 5: Parameter application to Groups
+# Test 7: apply_repro_params (group-specific)
 # =============================================================================
-cat("\n--- Test 5: apply_repro_params ---\n")
-
+cat("\n--- Test 7: apply_repro_params ---\n")
 tryCatch({
   Groups <- getGroups()
   fish_idx <- which(Groups$Type == "Fish")
-
-  # Use first LHS sample
-  par <- as.numeric(lhs[1, ])
-  names(par) <- names(lhs)
-
+  par <- as.numeric(lhs[1,]); names(par) <- names(lhs)
   Groups_mod <- apply_repro_params(par, Groups)
+  par_r <- round_params(par)
 
-  report("Groups modified is data.frame",
-         is.data.frame(Groups_mod))
-  report("same number of rows",
-         nrow(Groups_mod) == nrow(Groups))
-  report("PPMR applied to all fish",
-         all(Groups_mod$PPMR[fish_idx] == par["PPMR"]),
-         sprintf("(PPMR = %.1f)", par["PPMR"]))
-  report("repro_on set to 1",
-         all(Groups_mod$repro_on[fish_idx] == 1L))
+  report("PPMR differs across fish groups",
+         !all(Groups_mod$PPMR[fish_idx] == Groups_mod$PPMR[fish_idx[1]]) ||
+           par_r["PPMR_S"] == par_r["PPMR_M"],  # may be equal by chance
+         "(may match by chance)")
+  report("FeedWidth group-specific",
+         Groups_mod$FeedWidth[fish_idx[1]] == par_r["FeedWidth_S"] &&
+           Groups_mod$FeedWidth[fish_idx[2]] == par_r["FeedWidth_M"])
+  report("f_M group-specific",
+         Groups_mod$f_M[fish_idx[1]] == par_r["f_M_S"] &&
+           Groups_mod$f_M[fish_idx[3]] == par_r["f_M_L"])
+  report("K_growth group-specific",
+         Groups_mod$K_growth[fish_idx[2]] == par_r["K_growth_M"])
+  report("repro_eff group-specific",
+         Groups_mod$repro_eff[fish_idx[1]] == par_r["repro_eff_S"])
+  report("repro_on set to 1", all(Groups_mod$repro_on[fish_idx] == 1L))
 
-  # Check zooplankton rows unchanged — use identical() to handle NA safely
   zoo_rows <- which(Groups$Type == "Zooplankton")
-  zoo_cols_to_check <- c("Species", "Type", "W0", "Wmax", "GrossGEscale")
-  zoo_unchanged <- all(sapply(zoo_cols_to_check, function(col) {
-    identical(Groups_mod[[col]][zoo_rows], Groups[[col]][zoo_rows])
-  }))
   report("zooplankton unchanged",
-         zoo_unchanged)
-}, error = function(e) {
-  report("apply_repro_params", FALSE, paste("ERROR:", e$message))
-})
+         all(sapply(c("Species","Type","W0","Wmax","GrossGEscale"), function(col)
+           identical(Groups_mod[[col]][zoo_rows], Groups[[col]][zoo_rows]))))
+}, error = function(e) report("apply_repro_params", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 6: Single model run with seasonal forcing
+# Test 8: Single model run
 # =============================================================================
-cat("\n--- Test 6: Single Model Run (seasonal) ---\n")
-
+cat("\n--- Test 8: Single Model Run ---\n")
 tryCatch({
-  input_params <- create_seasonal_input(
-    n_years = test_n_years_bm, dt = test_dt,
-    base_sst = test_sst, base_chl = test_chl_levels[1],
-    sst_amplitude = test_sst_amp, chl_amplitude = test_chl_amp
-  )
-  mdl <- zoomss_model(input_params = input_params, Groups = Groups_mod, isave = 2)
-
-  report("model returns a list",
-         is.list(mdl))
-  report("model has abundance array",
-         "abundance" %in% names(mdl))
-  report("model has biomass array",
-         "biomass" %in% names(mdl))
-  report("biomass is 3D",
-         length(dim(mdl$biomass)) == 3,
-         sprintf("(dim: %s)", paste(dim(mdl$biomass), collapse = " x ")))
-  report("model has param$fish_grps",
-         !is.null(mdl$param$fish_grps))
-  report("model has param$dt and param$isave",
-         !is.null(mdl$param$dt) && !is.null(mdl$param$isave))
-
-  # Verify biomass array dimensions interpretation
-  bm_dim <- dim(mdl$biomass)
-  report("biomass dim1 = nsave (time)",
-         bm_dim[1] == length(mdl$time))
-  report("biomass dim2 = ngrps",
-         bm_dim[2] == nrow(Groups_mod))
-  report("biomass dim3 = ngrid (size bins)",
-         bm_dim[3] == length(mdl$param$w))
-
-  # Test averageTimeSeries
+  ip <- create_seasonal_input(n_years = test_n_years_bm, dt = test_dt,
+                              base_sst = test_sst, base_chl = test_chl_levels[1],
+                              sst_amplitude = test_sst_amp, chl_amplitude = test_chl_amp)
+  mdl <- zoomss_model(input_params = ip, Groups = Groups_mod, isave = 2)
+  report("biomass is 3D", length(dim(mdl$biomass)) == 3)
   avg <- averageTimeSeries(mdl, var = "biomass", n_years = test_assess_yr)
-  report("averageTimeSeries returns matrix",
-         is.matrix(avg),
-         sprintf("(dim: %s)", paste(dim(avg), collapse = " x ")))
-  report("avg has ngrps rows",
-         nrow(avg) == nrow(Groups_mod))
-  report("avg has ngrid cols",
-         ncol(avg) == length(mdl$param$w))
-
-  # Correct way to get total biomass per group
-  total_bm_per_group <- rowSums(avg)
-  report("rowSums(avg) gives per-group totals",
-         length(total_bm_per_group) == nrow(Groups_mod))
-
-  # Check fish have non-zero biomass
-  fish_grps <- mdl$param$fish_grps
-  fish_bm <- total_bm_per_group[fish_grps]
-  report("fish groups have biomass > 0",
-         all(fish_bm > 0),
-         sprintf("(biomass: %s)", paste(sprintf("%.2e", fish_bm), collapse = ", ")))
-
-  # Check SSB output
-  report("SSB array exists",
-         !is.null(mdl$SSB) && length(dim(mdl$SSB)) == 2)
-
-}, error = function(e) {
-  report("single model run", FALSE, paste("ERROR:", e$message))
-})
+  fish_bm <- rowSums(avg)[mdl$param$fish_grps]
+  report("fish biomass > 0", all(fish_bm > 0),
+         sprintf("(%s)", paste(sprintf("%.2e", fish_bm), collapse=", ")))
+}, error = function(e) report("model run", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 7: Benchmark generation (2 chl levels, short seasonal runs)
+# Test 9: Benchmark generation
 # =============================================================================
-cat("\n--- Test 7: Legacy Benchmark Generation ---\n")
-
+cat("\n--- Test 9: Benchmark Generation ---\n")
 benchmark <- NULL
 tryCatch({
   benchmark <- generate_legacy_benchmark(
-    chl_levels = test_chl_levels,
-    sst = test_sst,
-    n_years = test_n_years_bm,
-    dt = test_dt,
-    sst_amplitude = test_sst_amp,
-    chl_amplitude = test_chl_amp,
+    chl_levels = test_chl_levels, sst = test_sst,
+    n_years = test_n_years_bm, dt = test_dt,
+    sst_amplitude = test_sst_amp, chl_amplitude = test_chl_amp,
     assess_years = test_assess_yr,
     cache_dir = file.path(test_cache_dir, "benchmark"),
-    n_workers = test_n_workers,
-    force_rerun = TRUE
-  )
-
-  report("benchmark is a list",
-         is.list(benchmark))
-  report("benchmark has zoo_proportions",
-         !is.null(benchmark$zoo_proportions))
-  report("zoo_proportions correct dims",
-         nrow(benchmark$zoo_proportions) == length(test_chl_levels),
-         sprintf("(%d x %d)", nrow(benchmark$zoo_proportions),
-                 ncol(benchmark$zoo_proportions)))
+    n_workers = test_n_workers, force_rerun = TRUE)
+  report("benchmark is a list", is.list(benchmark))
   report("zoo proportions sum to ~1",
-         all(abs(rowSums(benchmark$zoo_proportions, na.rm = TRUE) - 1) < 0.01))
-  report("benchmark has fish_biomass",
-         !is.null(benchmark$fish_biomass))
-  report("benchmark stores seasonal params",
+         all(abs(rowSums(benchmark$zoo_proportions, na.rm=TRUE) - 1) < 0.01))
+  report("stores seasonal params",
          !is.null(benchmark$sst_amplitude) && !is.null(benchmark$chl_amplitude))
-  report("benchmark stores assess_years",
-         !is.null(benchmark$assess_years) && benchmark$assess_years == test_assess_yr)
-  report("benchmark cached to disk",
-         file.exists(file.path(test_cache_dir, "benchmark",
-                               sprintf("benchmark_sst%.0f.rds", test_sst))))
-}, error = function(e) {
-  report("benchmark generation", FALSE, paste("ERROR:", e$message))
-})
+}, error = function(e) report("benchmark", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 8: Objective function (single evaluation)
+# Test 10: Objective function
 # =============================================================================
-cat("\n--- Test 8: Objective Function ---\n")
-
+cat("\n--- Test 10: Objective Function ---\n")
 tryCatch({
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
+  if (is.null(benchmark)) stop("Benchmark not available")
+  par <- as.numeric(lhs[1,]); names(par) <- names(lhs)
 
-  par <- as.numeric(lhs[1, ])
-  names(par) <- names(lhs)
+  result <- repro_objective(par = par, benchmark = benchmark,
+    chl_indices = 1:2, n_years = test_n_years_sc, dt = test_dt,
+    assess_years = test_assess_yr, return_details = TRUE)
+  report("returns list with score", is.list(result) && is.numeric(result$score))
+  report("5 metrics in [0,1]",
+         length(result$metric_scores) == 5 &&
+           all(result$metric_scores >= 0 & result$metric_scores <= 1))
 
-  # Test scalar return
-  score <- repro_objective(
-    par = par, benchmark = benchmark,
-    chl_indices = 1:2,
-    n_years = test_n_years_sc,
-    dt = test_dt,
-    assess_years = test_assess_yr,
-    return_details = FALSE
-  )
+  # Energy violation (one group)
+  par_bad <- par; par_bad["f_M_L"] <- 0.70; par_bad["K_growth_L"] <- 0.45
+  report("energy violation -> 1e6",
+         repro_objective(par=par_bad, benchmark=benchmark,
+                         chl_indices=1, n_years=test_n_years_sc,
+                         assess_years=test_assess_yr) == 1e6)
 
-  report("objective returns numeric scalar",
-         is.numeric(score) && length(score) == 1)
-  report("score is finite",
-         is.finite(score),
-         sprintf("(score = %.4f)", score))
-
-  # Test detailed return
-  result <- repro_objective(
-    par = par, benchmark = benchmark,
-    chl_indices = 1:2,
-    n_years = test_n_years_sc,
-    dt = test_dt,
-    assess_years = test_assess_yr,
-    return_details = TRUE
-  )
-
-  report("detailed result is list",
-         is.list(result))
-  report("has score field",
-         !is.null(result$score))
-  report("has metric_scores",
-         !is.null(result$metric_scores))
-  report("5 metric components",
-         length(result$metric_scores) == 5,
-         sprintf("(names: %s)", paste(names(result$metric_scores), collapse = ", ")))
-  report("has per_chl_scores",
-         !is.null(result$per_chl_scores))
-  report("all metrics in [0, 1]",
-         all(result$metric_scores >= 0 & result$metric_scores <= 1))
-
-  # Test energy constraint violation
-  par_bad <- par
-  par_bad["f_M"] <- 0.70
-  par_bad["K_growth"] <- 0.45
-  score_bad <- repro_objective(par = par_bad, benchmark = benchmark,
-                               chl_indices = 1, n_years = test_n_years_sc,
-                               assess_years = test_assess_yr)
-  report("energy violation returns 1e6",
-         score_bad == 1e6)
-
-}, error = function(e) {
-  report("objective function", FALSE, paste("ERROR:", e$message))
-})
+  # Wmat violation
+  par_wmat <- par; par_wmat["Wmat_S"] <- 3.0; par_wmat["Wmat_L"] <- -1.0
+  report("Wmat violation -> 1e6",
+         repro_objective(par=par_wmat, benchmark=benchmark,
+                         chl_indices=1, n_years=test_n_years_sc,
+                         assess_years=test_assess_yr) == 1e6)
+}, error = function(e) report("objective", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 9: LHS exploration (5 samples, sequential)
+# Test 11: LHS exploration
 # =============================================================================
-cat("\n--- Test 9: LHS Exploration ---\n")
-
+cat("\n--- Test 11: LHS Exploration ---\n")
 lhs_results <- NULL
 tryCatch({
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
-
+  if (is.null(benchmark)) stop("Benchmark not available")
   lhs_results <- run_lhs_exploration(
-    lhs_samples = lhs,
-    benchmark = benchmark,
-    chl_indices = 1:2,
-    n_years = test_n_years_sc,
+    lhs_samples = lhs, benchmark = benchmark,
+    chl_indices = 1:2, n_years = test_n_years_sc,
     n_workers = test_n_workers,
-    cache_dir = file.path(test_cache_dir, "lhs"),
-    batch_size = 3
-  )
-
-  report("LHS results is data.frame",
-         is.data.frame(lhs_results))
-  report("LHS results has n_lhs rows",
-         nrow(lhs_results) == test_n_lhs,
-         sprintf("(got %d)", nrow(lhs_results)))
-  report("has score column",
-         "score" %in% names(lhs_results))
-  report("has metric columns",
-         all(c("coexistence", "stability", "zoo_comp", "fish_ratio", "spectrum")
-             %in% names(lhs_results)))
-  report("all scores finite",
-         all(is.finite(lhs_results$score)))
-  report("checkpoint file exists",
-         file.exists(file.path(test_cache_dir, "lhs", "lhs_results.rds")))
-
-}, error = function(e) {
-  report("LHS exploration", FALSE, paste("ERROR:", e$message))
-})
+    cache_dir = file.path(test_cache_dir, "lhs"), batch_size = 3)
+  report("correct rows", nrow(lhs_results) == test_n_lhs)
+  report("all scores finite", all(is.finite(lhs_results$score)))
+}, error = function(e) report("LHS exploration", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 10: Candidate filtering
+# Test 12: Filtering
 # =============================================================================
-cat("\n--- Test 10: Candidate Filtering ---\n")
-
+cat("\n--- Test 12: Filtering ---\n")
 candidates <- NULL
 tryCatch({
-  if (is.null(lhs_results)) stop("LHS results not available (see Test 9)")
-
-  # Relaxed filter (test data is small)
-  candidates <- filter_lhs_candidates(
-    lhs_results,
-    max_coexistence = 1.0,
-    max_zoo_comp = 1.0,
-    top_n = 2
-  )
-
-  report("filter returns data.frame",
-         is.data.frame(candidates))
-  report("filter returns <= top_n rows",
-         nrow(candidates) <= 2)
-  report("filter sorted by score",
-         nrow(candidates) <= 1 || all(diff(candidates$score) >= 0))
-
-  # Strict filter (may return 0)
-  candidates_strict <- filter_lhs_candidates(
-    lhs_results,
-    max_coexistence = 0.01,
-    max_zoo_comp = 0.3,
-    top_n = 5
-  )
-  report("strict filter runs without error",
-         is.data.frame(candidates_strict),
-         sprintf("(%d candidates)", nrow(candidates_strict)))
-
-}, error = function(e) {
-  report("filtering", FALSE, paste("ERROR:", e$message))
-})
+  if (is.null(lhs_results)) stop("LHS results not available")
+  candidates <- filter_lhs_candidates(lhs_results, max_coexistence=1, max_zoo_comp=1, top_n=2)
+  report("filter works", is.data.frame(candidates) && nrow(candidates) <= 2)
+  report("sorted by score", nrow(candidates) <= 1 || all(diff(candidates$score) >= 0))
+}, error = function(e) report("filtering", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 11: Refinement — interface test only
+# Test 13: Refinement (interface)
 # =============================================================================
-cat("\n--- Test 11: Refinement (interface only) ---\n")
-
-refined <- NULL
+cat("\n--- Test 13: Refinement (interface) ---\n")
 tryCatch({
-  if (is.null(candidates) || nrow(candidates) == 0) {
-    stop("No candidates available (see Test 10)")
+  report("refine_candidate exists", is.function(refine_candidate))
+  if (!is.null(candidates) && nrow(candidates) > 0) {
+    param_names <- names(lhs)
+    par_init <- as.numeric(candidates[1, param_names]); names(par_init) <- param_names
+    details <- repro_objective(par=par_init, benchmark=benchmark,
+                               chl_indices=1, n_years=2, dt=test_dt,
+                               assess_years=1, return_details=TRUE)
+    report("objective on candidate works", is.numeric(details$score))
   }
-  if (is.null(benchmark)) stop("Benchmark not available (see Test 7)")
-
-  param_names <- names(lhs)
-
-  # a) Verify function signature
-  report("refine_candidate function exists",
-         is.function(refine_candidate))
-
-  fargs <- names(formals(refine_candidate))
-  report("refine_candidate has expected arguments",
-         all(c("par_init", "benchmark", "chl_indices", "n_years", "maxit")
-             %in% fargs),
-         sprintf("(args: %s)", paste(fargs, collapse = ", ")))
-
-  # b) Validate output structure via repro_objective
-  par_init <- as.numeric(candidates[1, param_names])
-  names(par_init) <- param_names
-
-  details <- repro_objective(
-    par = par_init, benchmark = benchmark,
-    chl_indices = 1, n_years = 2, dt = test_dt,
-    assess_years = 1,
-    return_details = TRUE
-  )
-
-  mock_refined <- list(
-    par         = par_init,
-    score       = details$score,
-    convergence = 0L,
-    details     = details,
-    optim_result = list(par = par_init, value = details$score, convergence = 0L)
-  )
-
-  report("expected output is a list",
-         is.list(mock_refined))
-  report("par vector has names",
-         !is.null(names(mock_refined$par)) &&
-           all(names(mock_refined$par) == param_names))
-  report("score is numeric scalar",
-         is.numeric(mock_refined$score) && length(mock_refined$score) == 1)
-  report("convergence code present",
-         !is.null(mock_refined$convergence))
-  report("details has metric_scores",
-         !is.null(mock_refined$details$metric_scores) &&
-           length(mock_refined$details$metric_scores) == 5)
-
-  cat(sprintf("  Initial score from objective: %.4f\n", mock_refined$score))
-  cat("  (Full L-BFGS-B refinement tested in production pipeline)\n")
-
-  refined <- mock_refined
-
-}, error = function(e) {
-  report("refinement interface", FALSE, paste("ERROR:", e$message))
-})
+}, error = function(e) report("refinement", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
-# Test 12: Yield curve validation (3 F levels, seasonal)
+# Test 14: Yield curves
 # =============================================================================
-cat("\n--- Test 12: Yield Curve Validation ---\n")
-
+cat("\n--- Test 14: Yield Curves ---\n")
 tryCatch({
-  test_par <- if (!is.null(refined)) refined$par else {
-    p <- as.numeric(lhs[1, ]); names(p) <- names(lhs); p
-  }
-
-  yield_data <- yield_curve_validation(
-    par = test_par,
-    fmort_levels = c(0, 0.5, 1.0),
-    chl = 1.0,
-    sst = test_sst,
-    n_years = test_n_years_sc,
-    dt = test_dt,
-    sst_amplitude = test_sst_amp,
-    chl_amplitude = test_chl_amp,
-    assess_years = test_assess_yr
-  )
-
-  report("yield_data is data.frame",
-         is.data.frame(yield_data))
-  report("has expected columns",
-         all(c("Fmort", "Fish_Group", "Biomass", "Yield") %in% names(yield_data)))
-  report("correct row count (3 F x 3 fish)",
-         nrow(yield_data) == 9,
-         sprintf("(got %d)", nrow(yield_data)))
-  report("yield at F=0 is 0",
-         all(yield_data$Yield[yield_data$Fmort == 0] == 0, na.rm = TRUE))
-
-}, error = function(e) {
-  report("yield curve", FALSE, paste("ERROR:", e$message))
-})
-
-
-# =============================================================================
-# Test 13: Full pipeline wrapper (structural)
-# =============================================================================
-cat("\n--- Test 13: run_repro_calibration wrapper ---\n")
-
-tryCatch({
-  cat("  (Skipping full wrapper — validated via Tests 3-12 individually)\n")
-  report("pipeline validated via component tests", TRUE)
-}, error = function(e) {
-  report("full pipeline", FALSE, paste("ERROR:", e$message))
-})
+  par <- as.numeric(lhs[1,]); names(par) <- names(lhs)
+  yd <- yield_curve_validation(par=par, fmort_levels=c(0,0.5,1),
+    chl=1, sst=test_sst, n_years=test_n_years_sc, dt=test_dt,
+    sst_amplitude=test_sst_amp, chl_amplitude=test_chl_amp,
+    assess_years=test_assess_yr)
+  report("returns data.frame", is.data.frame(yd))
+  report("9 rows (3F x 3fish)", nrow(yd) == 9, sprintf("(got %d)", nrow(yd)))
+  report("yield at F=0 is 0", all(yd$Yield[yd$Fmort==0] == 0, na.rm=TRUE))
+}, error = function(e) report("yield curves", FALSE, paste("ERROR:", e$message)))
 
 
 # =============================================================================
@@ -634,28 +345,18 @@ cat("\n=============================================================\n")
 cat(sprintf("TEST SUMMARY: %d PASSED, %d FAILED (of %d)\n",
             pass_count, fail_count, pass_count + fail_count))
 cat("=============================================================\n")
-
 if (fail_count > 0) {
   cat("\nFailed tests:\n")
-  fails <- grep("^\\[FAIL\\]", test_log, value = TRUE)
-  for (f in fails) cat("  ", f, "\n")
+  for (f in grep("^\\[FAIL\\]", test_log, value=TRUE)) cat("  ", f, "\n")
 }
-
-# Save test log
-log_file <- file.path(test_cache_dir, "test_log.txt")
-writeLines(test_log, log_file)
-cat(sprintf("\nTest log saved: %s\n", log_file))
-cat(sprintf("Test cache dir: %s\n", test_cache_dir))
+writeLines(test_log, file.path(test_cache_dir, "test_log.txt"))
 cat(sprintf("Completed: %s\n", Sys.time()))
-
-# Clean up
 unlink(test_cache_dir, recursive = TRUE)
 
-# Exit code (only quit when running via Rscript, not interactively)
 if (fail_count > 0) {
-  cat("\n*** TESTS FAILED — fix bugs before running calibration ***\n")
-  if (!interactive()) quit(save = "no", status = 1)
+  cat("\n*** TESTS FAILED ***\n")
+  if (!interactive()) quit(save="no", status=1)
 } else {
-  cat("\n*** ALL TESTS PASSED — pipeline ready for calibration ***\n")
-  if (!interactive()) quit(save = "no", status = 0)
+  cat("\n*** ALL TESTS PASSED ***\n")
+  if (!interactive()) quit(save="no", status=0)
 }

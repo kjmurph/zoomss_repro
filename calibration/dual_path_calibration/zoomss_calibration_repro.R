@@ -11,15 +11,19 @@
 # Architecture: LHS exploration -> filter -> L-BFGS-B refinement
 # Follows pattern from zoomss_calibration.R (fishing mortality calibration)
 #
-# Parameter sharing strategy (mixed):
-#   Shared across fish groups: PPMR, FeedWidth, K_growth, f_M, repro_eff
-#   Group-specific: Wmat (3), ZSpre (3), ZSexp (3)
-#   Total free dimensions: 14
+# All parameters are group-specific (S = Small, M = Medium, L = Large):
+#   PPMR (3), FeedWidth (3), K_growth (3), f_M (3), repro_eff (3),
+#   Wmat (3), ZSpre (3), ZSexp (3)
+#   Total free dimensions: 24
 #
-# Energy budget constraint: f_M + K_growth + R_frac = 1, R_frac >= 0.05
+# Constraints:
+#   Energy budget:  f_M_X + K_growth_X + R_frac_X = 1, R_frac_X >= 0.15
+#                   (enforced independently per fish group)
+#   Wmat ordering:  Wmat_S <= Wmat_M <= Wmat_L (biological realism)
+#
+# Rounding: PPMR rounded to integer, all other parameters to 2 d.p.
 #
 # Environmental forcing: Seasonal SST and chl via createEnviroData().
-# All simulations use seasonal forcing for realism and stability.
 # =============================================================================
 
 
@@ -27,112 +31,134 @@
 
 #' Define the calibration parameter space
 #'
-#' Returns a data.frame describing each free parameter, its bounds,
-#' and whether it is shared across fish groups or group-specific.
+#' All 8 parameter types are group-specific (S, M, L).
+#' Total: 24 free dimensions.
 #'
-#' @return data.frame with columns: name, lower, upper, shared, group_idx
+#' @return data.frame with columns: name, lower, upper, group_idx
 #' @export
 repro_param_space <- function() {
 
-  # Shared parameters (applied to all 3 fish groups)
-  shared <- data.frame(
-    name   = c("PPMR", "FeedWidth", "K_growth", "f_M", "repro_eff"),
-    lower  = c(50,     0.8,         0.15,       0.30,  0.001),
-    upper  = c(500,    2.0,         0.45,       0.70,  1.0),
-    shared = TRUE,
-    group_idx = NA_integer_,
-    stringsAsFactors = FALSE
+  # Parameter types with bounds: c(lower, upper)
+  # Wmat has group-specific bounds (different Wmax per group)
+  param_defs <- list(
+    PPMR      = c(50,    500),
+    FeedWidth = c(0.8,   2.0),
+    K_growth  = c(0.15,  0.45),
+    f_M       = c(0.30,  0.70),
+    repro_eff = c(0.001, 1.0),
+    Wmat      = list(S = c(-2.0, 1.0), M = c(-2.0, 3.0), L = c(-2.0, 5.0)),
+    ZSpre     = c(0.01,  1.0),
+    ZSexp     = c(0.1,   1.0)
   )
 
-  # Group-specific parameters
-  # Fish_Small (Wmax=2, W0=-3), Fish_Med (Wmax=4, W0=-3), Fish_Large (Wmax=6, W0=-3)
-  # Wmat bounds: [W0+1, Wmax-1] for each group
-  group_specific <- data.frame(
-    name   = c("Wmat_S", "Wmat_M", "Wmat_L",
-               "ZSpre_S", "ZSpre_M", "ZSpre_L",
-               "ZSexp_S", "ZSexp_M", "ZSexp_L"),
-    lower  = c(-2.0,  -2.0,  -2.0,
-               0.01,  0.01,  0.01,
-               0.1,   0.1,   0.1),
-    upper  = c(1.0,   3.0,   5.0,
-               1.0,   1.0,   1.0,
-               1.0,   1.0,   1.0),
-    shared = FALSE,
-    group_idx = c(1L, 2L, 3L,
-                  1L, 2L, 3L,
-                  1L, 2L, 3L),
-    stringsAsFactors = FALSE
-  )
+  rows <- list()
+  suffixes <- c("S", "M", "L")
+  grp_idx  <- c(1L, 2L, 3L)
 
-  rbind(shared, group_specific)
+  for (pname in names(param_defs)) {
+    bounds <- param_defs[[pname]]
+    for (i in seq_along(suffixes)) {
+      sfx <- suffixes[i]
+      full_name <- paste0(pname, "_", sfx)
+      if (is.list(bounds)) {
+        b <- bounds[[sfx]]
+      } else {
+        b <- bounds
+      }
+      rows[[length(rows) + 1]] <- data.frame(
+        name = full_name, lower = b[1], upper = b[2],
+        group_idx = grp_idx[i], stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  do.call(rbind, rows)
+}
+
+
+#' Round parameters for model application
+#'
+#' PPMR values are rounded to integers; all other parameters to 2 d.p.
+#'
+#' @param par Named numeric vector
+#' @return Named numeric vector with rounded values
+#' @export
+round_params <- function(par) {
+  ppmr_idx <- grep("^PPMR", names(par))
+  if (length(ppmr_idx) > 0) par[ppmr_idx] <- round(par[ppmr_idx])
+  other_idx <- setdiff(seq_along(par), ppmr_idx)
+  if (length(other_idx) > 0) par[other_idx] <- round(par[other_idx], 2)
+  par
 }
 
 
 #' Map a parameter vector to Groups data.frame modifications
 #'
-#' Takes a numeric vector (from LHS or optimiser) and applies values
-#' to the Groups data.frame, respecting shared/group-specific structure.
+#' All parameters are group-specific. Rounded before application.
 #'
 #' @param par Named numeric vector of parameter values
 #' @param Groups data.frame from getGroups()
-#' @param param_space Output of repro_param_space()
 #' @return Modified Groups data.frame
 #' @export
-apply_repro_params <- function(par, Groups, param_space = repro_param_space()) {
+apply_repro_params <- function(par, Groups) {
 
   fish_idx <- which(Groups$Type == "Fish")
   stopifnot(length(fish_idx) == 3)
 
-  # Shared parameters
-  if ("PPMR" %in% names(par))      Groups$PPMR[fish_idx]      <- par["PPMR"]
-  if ("FeedWidth" %in% names(par))  Groups$FeedWidth[fish_idx]  <- par["FeedWidth"]
-  if ("K_growth" %in% names(par))   Groups$K_growth[fish_idx]   <- par["K_growth"]
-  if ("f_M" %in% names(par))        Groups$f_M[fish_idx]        <- par["f_M"]
-  if ("repro_eff" %in% names(par))  Groups$repro_eff[fish_idx]  <- par["repro_eff"]
+  par <- round_params(par)
 
-  # Group-specific parameters
   grp_map <- c(S = 1L, M = 2L, L = 3L)
+  param_types <- c("PPMR", "FeedWidth", "K_growth", "f_M",
+                    "repro_eff", "Wmat", "ZSpre", "ZSexp")
+
   for (suffix in c("S", "M", "L")) {
     fi <- fish_idx[grp_map[suffix]]
-    wmat_name  <- paste0("Wmat_", suffix)
-    zspre_name <- paste0("ZSpre_", suffix)
-    zsexp_name <- paste0("ZSexp_", suffix)
-
-    if (wmat_name %in% names(par))  Groups$Wmat[fi]  <- par[wmat_name]
-    if (zspre_name %in% names(par)) Groups$ZSpre[fi]  <- par[zspre_name]
-    if (zsexp_name %in% names(par)) Groups$ZSexp[fi]  <- par[zsexp_name]
+    for (ptype in param_types) {
+      pname <- paste0(ptype, "_", suffix)
+      if (pname %in% names(par)) {
+        Groups[[ptype]][fi] <- par[pname]
+      }
+    }
   }
 
-  # Ensure reproduction is enabled
   Groups$repro_on[fish_idx] <- 1L
   Groups
 }
 
 
-#' Enforce energy budget constraint: R_frac >= min_rfrac
+#' Enforce energy budget constraint per fish group
 #'
-#' Includes a small tolerance (default 1e-10) to handle IEEE 754
-#' floating-point arithmetic edge cases, e.g. 1 - 0.50 - 0.45 = 0.04999...
+#' Each group must independently satisfy: R_frac = 1 - f_M - K_growth >= 0.15
 #'
 #' @param par Named numeric vector
-#' @param min_rfrac Minimum R_frac (default 0.05)
+#' @param min_rfrac Minimum R_frac (default 0.15)
 #' @param tol Floating-point tolerance (default 1e-10)
-#' @return Logical: TRUE if constraint satisfied
+#' @return Logical: TRUE if all three groups satisfy constraint
 #' @export
-check_energy_constraint <- function(par, min_rfrac = 0.05, tol = 1e-10) {
-  f_M <- par["f_M"]
-  K_growth <- par["K_growth"]
-  R_frac <- 1 - f_M - K_growth
-  R_frac >= (min_rfrac - tol)
+check_energy_constraint <- function(par, min_rfrac = 0.15, tol = 1e-10) {
+  for (sfx in c("S", "M", "L")) {
+    f_M <- par[paste0("f_M_", sfx)]
+    K_growth <- par[paste0("K_growth_", sfx)]
+    R_frac <- 1 - f_M - K_growth
+    if (R_frac < (min_rfrac - tol)) return(FALSE)
+  }
+  TRUE
+}
+
+
+#' Enforce maturation size ordering: Wmat_S <= Wmat_M <= Wmat_L
+#'
+#' @param par Named numeric vector
+#' @return Logical: TRUE if ordering constraint satisfied
+#' @export
+check_wmat_ordering <- function(par) {
+  par["Wmat_S"] <= par["Wmat_M"] && par["Wmat_M"] <= par["Wmat_L"]
 }
 
 
 # --- Seasonal Environment Helper ---------------------------------------------
 
 #' Create seasonal environmental forcing for a given chl level
-#'
-#' Wraps createEnviroData() + createInputParams() into a single call.
-#' This ensures all calibration runs use consistent seasonal forcing.
 #'
 #' @param n_years Simulation length in years
 #' @param dt Time step (default 0.1)
@@ -167,10 +193,6 @@ create_seasonal_input <- function(n_years, dt = 0.1,
 # --- Benchmark Generation -----------------------------------------------------
 
 #' Generate legacy benchmark (repro_on = 0) across chl gradient
-#'
-#' Runs the model with fish reproduction disabled to establish
-#' calibration targets for zooplankton community composition.
-#' Uses seasonal environmental forcing for realism and stability.
 #'
 #' @param chl_levels Numeric vector of chlorophyll concentrations (mg/m^3)
 #' @param sst Numeric, base sea surface temperature (default 15)
@@ -210,12 +232,10 @@ generate_legacy_benchmark <- function(chl_levels,
           " chl levels at SST = ", sst, "\u00b0C (seasonal, ",
           n_years, "yr, assess final ", assess_years, "yr)")
 
-  # Groups with reproduction OFF
   Groups <- getGroups()
   fish_idx <- which(Groups$Type == "Fish")
   Groups$repro_on[fish_idx] <- 0L
 
-  # Parallel execution
   future::plan(future::multisession, workers = min(n_workers, length(chl_levels)))
   on.exit(future::plan(future::sequential), add = TRUE)
 
@@ -236,7 +256,6 @@ generate_legacy_benchmark <- function(chl_levels,
     mdl
   }, .options = furrr::furrr_options(seed = TRUE), .progress = TRUE)
 
-  # Extract metrics from final assess_years
   n_chl <- length(chl_levels)
   zoo_names <- Groups$Species[Groups$Type == "Zooplankton"]
   fish_names <- Groups$Species[Groups$Type == "Fish"]
@@ -249,7 +268,7 @@ generate_legacy_benchmark <- function(chl_levels,
   for (i in seq_along(results)) {
     mdl <- results[[i]]
     avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
-    avg_total <- rowSums(avg)  # sum across size bins -> vector of length ngrps
+    avg_total <- rowSums(avg)
     zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
     zoo_bm <- avg_total[zoo_idx]
     zoo_total <- sum(zoo_bm)
@@ -274,9 +293,9 @@ generate_legacy_benchmark <- function(chl_levels,
 
 #' Evaluate a parameter set across multiple chlorophyll levels
 #'
-#' Core objective function. Runs the model at each chl level with seasonal
-#' forcing and computes a composite score (lower is better).
-#' Assessment uses the final assess_years of the simulation.
+#' Runs the model at each chl level with seasonal forcing and computes a
+#' composite score (lower is better). Assessment uses the final assess_years.
+#' Enforces energy budget (per group) and Wmat ordering constraints.
 #'
 #' @param par Named numeric vector of parameter values
 #' @param benchmark Output of generate_legacy_benchmark()
@@ -309,16 +328,19 @@ repro_objective <- function(par,
 
   if (is.null(chl_indices)) chl_indices <- seq_along(benchmark$chl_levels)
 
-  # Energy constraint check
+  # Constraint checks
   if (!check_energy_constraint(par)) {
     if (return_details) return(list(score = 1e6, reason = "energy_constraint_violated"))
+    return(1e6)
+  }
+  if (!check_wmat_ordering(par)) {
+    if (return_details) return(list(score = 1e6, reason = "wmat_ordering_violated"))
     return(1e6)
   }
 
   Groups <- getGroups()
   Groups <- apply_repro_params(par, Groups)
 
-  # Seasonal forcing parameters from benchmark (with fallback defaults)
   sst_amp <- if (!is.null(benchmark$sst_amplitude)) benchmark$sst_amplitude else 4
   chl_amp <- if (!is.null(benchmark$chl_amplitude)) benchmark$chl_amplitude else 0.5
 
@@ -345,7 +367,6 @@ repro_objective <- function(par,
       )
       mdl <- zoomss_model(input_params = input_params, Groups = Groups, isave = 2)
 
-      # Final assess_years
       n_save <- length(mdl$time)
       dt_save <- mdl$param$isave * mdl$param$dt
       n_assess <- min(n_save, round(assess_years / dt_save))
@@ -381,7 +402,7 @@ repro_objective <- function(par,
 
       # 3. ZOO COMPOSITION (correlation with legacy)
       avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
-      avg_bm_total <- rowSums(avg_bm)  # sum across size bins -> per group total
+      avg_bm_total <- rowSums(avg_bm)
       zoo_bm <- avg_bm_total[zoo_idx]
       zoo_total <- sum(zoo_bm)
       if (zoo_total > 0) {
@@ -415,7 +436,7 @@ repro_objective <- function(par,
       all_abundance <- averageTimeSeries(mdl, var = "abundance",
                                          n_years = assess_years)
       w_vec <- mdl$param$w
-      total_abund <- colSums(all_abundance)  # sum across groups -> per size bin
+      total_abund <- colSums(all_abundance)
       valid <- total_abund > 0
       if (sum(valid) > 5) {
         fit <- lm(log10(total_abund[valid]) ~ w_vec[valid])
@@ -440,7 +461,6 @@ repro_objective <- function(par,
     })
   }
 
-  # Composite
   metric_scores <- c(
     coexistence = mean(scores$coexistence, na.rm = TRUE),
     stability   = mean(scores$stability, na.rm = TRUE),
@@ -464,6 +484,9 @@ repro_objective <- function(par,
 
 #' Generate Latin Hypercube Sample of parameter space
 #'
+#' Enforces per-group energy budget (R_frac >= 0.15) and Wmat ordering
+#' (Wmat_S <= Wmat_M <= Wmat_L via sort).
+#'
 #' @param n_samples Number of samples (default 500)
 #' @param param_space Output of repro_param_space()
 #' @param seed Random seed
@@ -483,25 +506,38 @@ generate_lhs_samples <- function(n_samples = 500,
       lhs_unit[, i] * (param_space$upper[i] - param_space$lower[i])
   }
 
-  # Enforce energy constraint via rejection resampling
+  # Enforce energy constraint per group via rejection resampling
   for (row in seq_len(n_samples)) {
-    attempts <- 0
-    while (!check_energy_constraint(lhs_scaled[row, ]) && attempts < 100) {
-      f_M_idx <- which(param_space$name == "f_M")
-      K_idx <- which(param_space$name == "K_growth")
-      lhs_scaled[row, f_M_idx] <- runif(1, param_space$lower[f_M_idx],
-                                          param_space$upper[f_M_idx])
-      lhs_scaled[row, K_idx] <- runif(1, param_space$lower[K_idx],
-                                       param_space$upper[K_idx])
-      attempts <- attempts + 1
-    }
-    if (!check_energy_constraint(lhs_scaled[row, ])) {
-      K_idx <- which(param_space$name == "K_growth")
-      f_M_idx <- which(param_space$name == "f_M")
-      lhs_scaled[row, K_idx] <- min(lhs_scaled[row, K_idx],
-                                     0.95 - lhs_scaled[row, f_M_idx])
+    for (sfx in c("S", "M", "L")) {
+      f_M_col <- paste0("f_M_", sfx)
+      K_col   <- paste0("K_growth_", sfx)
+      f_M_idx <- which(param_space$name == f_M_col)
+      K_idx   <- which(param_space$name == K_col)
+
+      attempts <- 0
+      while ((1 - lhs_scaled[row, f_M_idx] - lhs_scaled[row, K_idx]) < 0.15 &&
+             attempts < 100) {
+        lhs_scaled[row, f_M_idx] <- runif(1, param_space$lower[f_M_idx],
+                                            param_space$upper[f_M_idx])
+        lhs_scaled[row, K_idx]   <- runif(1, param_space$lower[K_idx],
+                                            param_space$upper[K_idx])
+        attempts <- attempts + 1
+      }
+      # Fallback: force compliance
+      if ((1 - lhs_scaled[row, f_M_idx] - lhs_scaled[row, K_idx]) < 0.15) {
+        lhs_scaled[row, K_idx] <- min(lhs_scaled[row, K_idx],
+                                       0.85 - lhs_scaled[row, f_M_idx])
+      }
     }
   }
+
+  # Enforce Wmat ordering: sort so Wmat_S <= Wmat_M <= Wmat_L
+  wmat_cols <- match(c("Wmat_S", "Wmat_M", "Wmat_L"), param_space$name)
+  for (row in seq_len(n_samples)) {
+    wmat_vals <- sort(lhs_scaled[row, wmat_cols])
+    lhs_scaled[row, wmat_cols] <- wmat_vals
+  }
+
   as.data.frame(lhs_scaled)
 }
 
@@ -528,7 +564,6 @@ run_lhs_exploration <- function(lhs_samples,
   if (is.null(cache_dir)) cache_dir <- file.path(tempdir(), "zoomss_calib_lhs")
   if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
 
-  # Default: 5 representative chl levels
   if (is.null(chl_indices)) {
     target_log10 <- c(-1.5, -1.0, -0.5, 0.0, 0.4)
     chl_indices <- sapply(target_log10, function(t) {
@@ -540,7 +575,6 @@ run_lhs_exploration <- function(lhs_samples,
   n_total <- nrow(lhs_samples)
   results_file <- file.path(cache_dir, "lhs_results.rds")
 
-  # Resume from checkpoint
   if (file.exists(results_file)) {
     existing <- readRDS(results_file)
     start_idx <- nrow(existing) + 1
@@ -656,6 +690,7 @@ refine_candidate <- function(par_init,
   obj_fn <- function(par) {
     names(par) <- names(par_init)
     if (!check_energy_constraint(par)) return(1e6)
+    if (!check_wmat_ordering(par)) return(1e6)
     repro_objective(par = par, benchmark = benchmark,
                     chl_indices = chl_indices, n_years = n_years)
   }
@@ -667,6 +702,8 @@ refine_candidate <- function(par_init,
   )
 
   names(result$par) <- names(par_init)
+  result$par <- round_params(result$par)
+
   details <- repro_objective(
     par = result$par, benchmark = benchmark,
     chl_indices = chl_indices, n_years = n_years,
@@ -683,11 +720,9 @@ refine_candidate <- function(par_init,
 
 #' Generate yield curves for a calibrated parameter set
 #'
-#' Uses seasonal environmental forcing consistent with calibration.
-#'
 #' @param par Named numeric vector of calibrated parameters
 #' @param fmort_levels Numeric vector of fishing mortality rates
-#' @param chl Chlorophyll concentration (mg/m^3, default 1.0)
+#' @param chl Chlorophyll (mg/m^3, default 1.0)
 #' @param sst Base SST (default 15)
 #' @param n_years Simulation length (default 400)
 #' @param dt Time step (default 0.1)
@@ -722,7 +757,7 @@ yield_curve_validation <- function(par,
     tryCatch({
       mdl <- zoomss_model(input_params = input_params, Groups = mdl_Groups, isave = 2)
       avg_bm <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
-      avg_bm_total <- rowSums(avg_bm)  # sum across size bins -> per group total
+      avg_bm_total <- rowSums(avg_bm)
       for (f in seq_along(fish_names)) {
         results <- rbind(results, data.frame(
           Fmort = fm, Fish_Group = fish_names[f],
@@ -747,9 +782,6 @@ yield_curve_validation <- function(par,
 # --- Pipeline Wrapper ---------------------------------------------------------
 
 #' Run the complete calibration pipeline
-#'
-#' Orchestrates benchmark generation, LHS exploration, filtering,
-#' and L-BFGS-B refinement. All runs use seasonal environmental forcing.
 #'
 #' @param n_samples LHS samples (default 500)
 #' @param n_workers Parallel workers (default 14)
@@ -780,7 +812,6 @@ run_repro_calibration <- function(n_samples = 500,
 
   if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
 
-  # Phase 1: Benchmark
   message("=== Phase 1: Generating Legacy Benchmark ===")
   log10_chl_seq <- seq(-1.7, 0.5, by = 0.1)
   chl_levels <- 10^log10_chl_seq
@@ -793,7 +824,6 @@ run_repro_calibration <- function(n_samples = 500,
     cache_dir = file.path(cache_dir, "benchmark")
   )
 
-  # Phase 2: LHS
   message("\n=== Phase 2: LHS Parameter Exploration ===")
   lhs_samples <- generate_lhs_samples(n_samples = n_samples, seed = seed)
   lhs_results <- run_lhs_exploration(
@@ -802,11 +832,9 @@ run_repro_calibration <- function(n_samples = 500,
     cache_dir = file.path(cache_dir, "lhs")
   )
 
-  # Phase 2b: Filter
   message("\n=== Phase 2b: Filtering Candidates ===")
   candidates <- filter_lhs_candidates(lhs_results, top_n = top_n_refine * 2)
 
-  # Phase 3: Refinement
   message("\n=== Phase 3: Refining Top Candidates ===")
   n_refine <- min(top_n_refine, nrow(candidates))
   refined <- list()

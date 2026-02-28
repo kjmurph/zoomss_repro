@@ -39,6 +39,7 @@ cat(sprintf("  Benchmark years:  %d\n", calib$settings$benchmark_years))
 cat(sprintf("  Screening years:  %d\n", calib$settings$screening_years))
 cat(sprintf("  Refinement years: %d\n", calib$settings$refinement_years))
 cat(sprintf("  Assessment years: %d (final)\n", calib$settings$assess_years))
+cat(sprintf("  Parameters:       %d (all group-specific)\n", nrow(calib$param_space)))
 cat(sprintf("  Best score:       %.4f\n", calib$best$score))
 ```
 
@@ -82,7 +83,7 @@ wrap_plots(p1, p2, p3, ncol = 1)
 
 ## Parameter Sensitivity
 
-```{r param-sensitivity, fig.height=10}
+```{r param-sensitivity, fig.height=16}
 param_names <- calib$param_space$name
 plots <- lapply(param_names, function(pn) {
   if (pn %in% names(lhs)) {
@@ -90,11 +91,11 @@ plots <- lapply(param_names, function(pn) {
       geom_point(alpha = 0.2, size = 0.5) +
       geom_smooth(method = "loess", se = FALSE, colour = "red") +
       theme_bw() + labs(title = pn) +
-      theme(plot.title = element_text(size = 9))
+      theme(plot.title = element_text(size = 8))
   }
 })
 plots <- plots[!sapply(plots, is.null)]
-wrap_plots(plots, ncol = 3)
+wrap_plots(plots, ncol = 4)
 ```
 
 # Part 2: Best Calibrated Parameters
@@ -103,19 +104,28 @@ wrap_plots(plots, ncol = 3)
 best <- calib$best
 par <- best$par
 
-cat("=== Best Parameters ===\n")
-cat("\nShared (all fish groups):\n")
-for (nm in c("PPMR", "FeedWidth", "K_growth", "f_M", "repro_eff")) {
-  cat(sprintf("  %-12s = %.4f\n", nm, par[nm]))
-}
-cat(sprintf("\n  R_frac = 1 - f_M - K_growth = %.4f\n",
-            1 - par["f_M"] - par["K_growth"]))
+cat("=== Best Parameters (PPMR integer, others 2dp) ===\n")
+cat("    All parameters are group-specific.\n\n")
 
-cat("\nGroup-specific:\n")
-cat(sprintf("  %-12s  Small    Med      Large\n", ""))
-for (base in c("Wmat", "ZSpre", "ZSexp")) {
-  vals <- par[paste0(base, "_", c("S", "M", "L"))]
-  cat(sprintf("  %-12s  %-8.4f %-8.4f %-8.4f\n", base, vals[1], vals[2], vals[3]))
+# Display as table: rows = param types, cols = S/M/L
+param_types <- c("PPMR", "FeedWidth", "K_growth", "f_M", "repro_eff",
+                  "Wmat", "ZSpre", "ZSexp")
+
+cat(sprintf("  %-12s  %-10s %-10s %-10s\n", "", "Small", "Medium", "Large"))
+cat(sprintf("  %-12s  %-10s %-10s %-10s\n", "", "-----", "------", "-----"))
+for (ptype in param_types) {
+  vals <- par[paste0(ptype, "_", c("S", "M", "L"))]
+  if (ptype == "PPMR") {
+    cat(sprintf("  %-12s  %-10.0f %-10.0f %-10.0f\n", ptype, vals[1], vals[2], vals[3]))
+  } else {
+    cat(sprintf("  %-12s  %-10.2f %-10.2f %-10.2f\n", ptype, vals[1], vals[2], vals[3]))
+  }
+}
+
+cat("\n  Energy budget (R_frac = 1 - f_M - K_growth):\n")
+for (sfx in c("S", "M", "L")) {
+  rfrac <- 1 - par[paste0("f_M_", sfx)] - par[paste0("K_growth_", sfx)]
+  cat(sprintf("    %s: R_frac = %.2f\n", sfx, rfrac))
 }
 
 cat("\n=== Metric Breakdown ===\n")
@@ -131,8 +141,6 @@ benchmark <- calib$benchmark
 chl_levels <- benchmark$chl_levels
 log10_chl <- benchmark$log10_chl
 assess_years <- benchmark$assess_years %||% 100
-
-# Seasonal forcing parameters from benchmark
 sst_amp <- benchmark$sst_amplitude %||% 4
 chl_amp <- benchmark$chl_amplitude %||% 0.5
 
@@ -174,7 +182,7 @@ for (j in seq_along(validation_chl_idx)) {
   ci <- validation_chl_idx[j]
   mdl <- validation_results[[as.character(ci)]]
   avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
-  avg_total <- rowSums(avg)  # sum across size bins -> per group total
+  avg_total <- rowSums(avg)
   zoo_idx <- which(mdl$param$Groups$Type == "Zooplankton")
   zoo_bm <- avg_total[zoo_idx]
   zoo_total <- sum(zoo_bm)
@@ -225,7 +233,7 @@ for (j in seq_along(validation_chl_idx)) {
   ci <- validation_chl_idx[j]
   mdl <- validation_results[[as.character(ci)]]
   avg <- averageTimeSeries(mdl, var = "biomass", n_years = assess_years)
-  avg_total <- rowSums(avg)  # sum across size bins -> per group total
+  avg_total <- rowSums(avg)
   fish_grps <- mdl$param$fish_grps
   for (f in seq_along(fish_names)) {
     fish_data <- rbind(fish_data, data.frame(
